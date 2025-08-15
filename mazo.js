@@ -28,10 +28,10 @@ export function barajar(array) {
   return array;
 }
 
-// Repartir cartas iniciales
 export function repartirCartas(mazo, cantidad = 5) {
   const mano = [];
   for (let i = 0; i < cantidad; i++) {
+    if (mazo.length === 0) break;
     mano.push(mazo.pop());
   }
   return mano;
