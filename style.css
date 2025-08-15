@@ -13,11 +13,16 @@ input, button {
   font-size: 16px;
 }
 
-h1, h2, h3 {
+h1, h3 {
   color: #ffeb3b;
 }
 
-.cartas-container {
+ul {
+  list-style: none;
+  padding: 0;
+}
+
+.cartas-container, .campos {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -38,43 +43,36 @@ h1, h2, h3 {
   color: #000;
   font-size: 16px;
   box-shadow: 2px 2px 10px rgba(0,0,0,0.5);
-  cursor: pointer;
 }
 
+/* Colores por judía */
 .judía-boom { background-color: #ff6666; }
-.la-pocha { background-color: #339933; }
+.la-pocha { background-color: #339900; }
 .judía-colorá { background-color: #ffcc66; }
 .la-pestosa { background-color: #66ccff; }
 .rocky-judía { background-color: #ff66ff; }
 .judía-bill { background-color: #66ffff; }
 .el-judicultor { background-color: #ff9966; }
-.hippy-judía { background-color: #99ff66; }
-
-#camposContainer {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin-top: 20px;
-}
+.hippy-judía { background-color: #66cc66; }
 
 .jugador {
-  margin: 10px;
-  border: 2px solid #fff;
+  margin: 20px;
+  border: 1px solid #fff;
   padding: 10px;
-  border-radius: 10px;
 }
 
 .campos {
   display: flex;
   justify-content: center;
-  flex-wrap: wrap;
 }
 
 .campo {
+  width: 120px;
+  height: 160px;
   margin: 5px;
-  border: 1px solid #fff;
-  padding: 5px;
-  border-radius: 5px;
-  min-width: 150px;
-  min-height: 180px;
+  border: 2px dashed #fff;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
