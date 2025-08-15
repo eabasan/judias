@@ -6,154 +6,21 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Juego de Judías</h1>
 
-  <label>Tu nombre: <input type="text" id="nombre" /></label>
-  <button id="guardarNombre">Guardar nombre</button>
-  <hr>
+<h1>Juego de Judías</h1>
 
-  <button id="crearPartida">Crear partida</button>
-  <input type="text" id="codigoPartida" placeholder="Código para unirse">
-  <button id="unirsePartida">Unirse a partida</button>
+<div>
+  <input type="text" id="nombre-jugador" placeholder="Nombre del jugador">
+  <button id="crear-partida">Crear partida</button>
+</div>
 
-  <h3>Jugadores en la partida:</h3>
-  <ul id="listaJugadores"></ul>
+<div id="mano-container">
+  <h3>Tu mano</h3>
+  <div class="cartas-container" id="mano"></div>
+</div>
 
-  <h3>Campos de cultivo:</h3>
-  <div id="camposContainer"></div>
+<div id="contenedor-jugadores"></div>
 
-  <h3>Tu mano:</h3>
-  <div class="cartas-container" id="cartasJugador"></div>
-
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-    import { getFirestore, doc, setDoc, onSnapshot, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
-    import { crearMazo, repartirCartas } from './mazo.js';
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyCA_tuTWdV8GJuzBbRgzOIyPszHR-kgpe4",
-      authDomain: "judias.firebaseapp.com",
-      projectId: "judias",
-      storageBucket: "judias.firebasestorage.app",
-      messagingSenderId: "1061180491958",
-      appId: "1:1061180491958:web:4bbd99457a56e58f34be17",
-      measurementId: "G-G3Y5NZWBEE"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    let nombreJugador = "";
-    let idPartida = "";
-    let mazo = [];
-    let manoJugador = [];
-    let campos = [[],[],[]];
-
-    document.getElementById("guardarNombre").onclick = () => {
-      nombreJugador = document.getElementById("nombre").value;
-      if(!nombreJugador) return alert("Introduce tu nombre");
-      alert("Nombre guardado: " + nombreJugador);
-    }
-
-    document.getElementById("crearPartida").onclick = async () => {
-      if(!nombreJugador) return alert("Guarda tu nombre");
-      idPartida = Math.random().toString(36).substring(2,7).toUpperCase();
-      mazo = crearMazo();
-      await setDoc(doc(db,"partidas",idPartida),{
-        jugadores: [nombreJugador],
-        campos: { [nombreJugador]: [[],[],[]] },
-        mano: { [nombreJugador]: repartirCartas(mazo,5) },
-        mazo: mazo
-      });
-      alert("Partida creada. Código: "+idPartida);
-      escucharPartida();
-    }
-
-    document.getElementById("unirsePartida").onclick = async () => {
-      if(!nombreJugador) return alert("Guarda tu nombre");
-      idPartida = document.getElementById("codigoPartida").value.toUpperCase();
-      const partidaRef = doc(db,"partidas",idPartida);
-      await updateDoc(partidaRef,{ jugadores: arrayUnion(nombreJugador) });
-      escucharPartida();
-    }
-
-    function escucharPartida() {
-      const partidaRef = doc(db,"partidas",idPartida);
-      onSnapshot(partidaRef, (docSnap)=>{
-        if(!docSnap.exists()) return;
-        const data = docSnap.data();
-
-        // actualizar lista de jugadores
-        const lista = document.getElementById("listaJugadores");
-        lista.innerHTML = "";
-        data.jugadores.forEach(j=>{
-          const li = document.createElement("li");
-          li.textContent = j;
-          lista.appendChild(li);
-        });
-
-        // actualizar campos de todos
-        const contenedor = document.getElementById("camposContainer");
-        contenedor.innerHTML = "";
-        data.jugadores.forEach(j=>{
-          const jugadorCampos = data.campos[j] || [[],[],[]];
-          const divJugador = document.createElement("div");
-          divJugador.innerHTML = `<h4>${j}</h4>`;
-          const divCampos = document.createElement("div");
-          divCampos.classList.add("campo");
-          jugadorCampos.forEach((campo,index)=>{
-            const campoDiv = document.createElement("div");
-            campo.forEach(c=>{
-              const cDiv = document.createElement("div");
-              cDiv.textContent = c.nombre;
-              cDiv.className = "carta "+c.nombre.toLowerCase().replace(/\s/g,'-');
-              campoDiv.appendChild(cDiv);
-            });
-            divCampos.appendChild(campoDiv);
-          });
-          divJugador.appendChild(divCampos);
-          contenedor.appendChild(divJugador);
-        });
-
-        // actualizar mano del jugador
-        manoJugador = data.mano[nombreJugador] || [];
-        const manoDiv = document.getElementById("cartasJugador");
-        manoDiv.innerHTML = "";
-        manoJugador.forEach((carta,i)=>{
-          const li = document.createElement("div");
-          li.textContent = carta.nombre;
-          li.className = "carta "+carta.nombre.toLowerCase().replace(/\s/g,'-');
-          li.onclick = ()=>plantarCarta(i);
-          manoDiv.appendChild(li);
-        });
-      });
-    }
-
-    async function plantarCarta(indice) {
-      const carta = manoJugador[indice];
-      const campoIndex = prompt("En qué campo plantar? 0, 1 o 2");
-      if(campoIndex === null) return;
-      const campoNum = parseInt(campoIndex);
-      if(campoNum<0 || campoNum>2) return alert("Campo inválido");
-
-      const partidaRef = doc(db,"partidas",idPartida);
-      const docSnap = await partidaRef.get();
-      const data = docSnap.data();
-      const jugadorCampos = data.campos[nombreJugador];
-
-      // si el campo está vacío o coincide tipo
-      if(jugadorCampos[campoNum].length===0 || jugadorCampos[campoNum][0].nombre===carta.nombre){
-        jugadorCampos[campoNum].push(carta);
-        data.mano[nombreJugador].splice(indice,1);
-        await updateDoc(partidaRef,{
-          [`campos.${nombreJugador}`]: jugadorCampos,
-          [`mano.${nombreJugador}`]: data.mano[nombreJugador]
-        });
-      } else {
-        alert("El tipo de judía no coincide, debes vender otro campo primero");
-      }
-    }
-
-  </script>
+<script type="module" src="main.js"></script>
 </body>
 </html>
