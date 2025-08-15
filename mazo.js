@@ -1,36 +1,32 @@
-export const judias = [
-  { nombre: "Judía Boom", cantidad: 18 },
-  { nombre: "La Pocha", cantidad: 14 },
-  { nombre: "Judía Colorá", cantidad: 8 },
-  { nombre: "La Pestosa", cantidad: 16 },
-  { nombre: "Rocky Judía", cantidad: 10 },
-  { nombre: "Judía Bill", cantidad: 20 },
-  { nombre: "El Judicultor", cantidad: 6 },
-  { nombre: "Hippy Judía", cantidad: 12 }
-];
-
+// Define las cartas del juego
 export function crearMazo() {
-  let mazo = [];
-  judias.forEach(j => {
-    for (let i = 0; i < j.cantidad; i++) {
-      mazo.push({ nombre: j.nombre });
-    }
-  });
-  return barajar(mazo);
+  return [
+    { nombre: "Judia Bill" },
+    { nombre: "Rocky Judía" },
+    { nombre: "Judía Boom" },
+    { nombre: "Judia Bill" },
+    { nombre: "Judía Boom" },
+    { nombre: "Rocky Judía" },
+    { nombre: "Judía Boom" },
+    { nombre: "Judia Bill" }
+    // Añade más cartas si quieres
+  ];
 }
 
-export function barajar(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array;
-}
-
-export function repartirCartas(mazo, cantidad = 5) {
+// Repartir cartas al azar
+export function repartirCartas(mazo, cantidad) {
   const mano = [];
+  const copia = [...mazo];
   for (let i = 0; i < cantidad; i++) {
-    mano.push(mazo.pop());
+    if (copia.length === 0) break;
+    const index = Math.floor(Math.random() * copia.length);
+    mano.push(copia.splice(index, 1)[0]);
   }
   return mano;
+}
+
+// Reconstruir carta desde nombre
+export function reconstruirCarta(nombre) {
+  const todos = crearMazo();
+  return todos.find(c => c.nombre === nombre);
 }

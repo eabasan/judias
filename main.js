@@ -1,4 +1,4 @@
-import { crearMazo, repartirCartas } from './mazo.js';
+import { crearMazo, repartirCartas, reconstruirCarta } from './mazo.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
 import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
@@ -16,18 +16,16 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-let nombreJugador = '';
-let codigoPartida = '';
+let nombreJugador;
+let codigoPartida;
 let mano = [];
 let campos = [[], [], []]; // 3 campos por jugador
 let mazo = [];
 
 const nombreInput = document.getElementById('nombre');
-const guardarNombreBtn = document.getElementById('guardarNombre');
 const crearBtn = document.getElementById('crearPartida');
 const unirseBtn = document.getElementById('unirsePartida');
 const codigoInput = document.getElementById('codigo');
-const partidaOpcionesDiv = document.getElementById('partidaOpciones');
 const codigoContainer = document.getElementById('codigoPartidaContainer');
 const manoContainer = document.getElementById('manoContainer');
 const camposContainer = document.getElementById('camposContainer');
@@ -83,7 +81,7 @@ function plantarCarta(indiceCarta) {
     }
   }
   if (planted) {
-    mano.splice(indiceCarta,1);
+    mano.splice(indiceCarta, 1);
     renderMano();
     renderCampos();
   } else {
@@ -91,55 +89,54 @@ function plantarCarta(indiceCarta) {
   }
 }
 
-// --- Guardar nombre ---
-guardarNombreBtn.addEventListener('click', () => {
-  const nombre = nombreInput.value.trim();
-  if (!nombre) return alert('Pon tu nombre');
-  nombreJugador = nombre;
-  partidaOpcionesDiv.style.display = 'block';
-  alert(`Nombre guardado: ${nombreJugador}`);
-});
-
-// --- Crear partida ---
 crearBtn.addEventListener('click', async () => {
-  if (!nombreJugador) return alert('Primero guarda tu nombre');
+  nombreJugador = nombreInput.value.trim();
+  if (!nombreJugador) return alert('Pon tu nombre');
+
   codigoPartida = generarCodigo();
   mazo = crearMazo();
-  mano = repartirCartas(mazo,5);
-  campos = [[],[],[]];
+  mano = repartirCartas(mazo, 5);
+  campos = [[], [], []];
   renderMano();
   renderCampos();
   codigoContainer.textContent = `Código de partida: ${codigoPartida}`;
 
   try {
     await setDoc(doc(db, 'partidas', codigoPartida), {
-      jugadores: [{nombre: nombreJugador, mano, campos}],
-      mazo
+      jugadores: [{ nombre: nombreJugador, mano: mano.map(c => c.nombre), campos: [[], [], []] }],
+      mazo: mazo.map(c => c.nombre)
     });
   } catch(e) {
     console.error(e);
+    alert('Error al crear partida');
   }
 });
 
-// --- Unirse a partida ---
 unirseBtn.addEventListener('click', async () => {
-  if (!nombreJugador) return alert('Primero guarda tu nombre');
-  const codigo = codigoInput.value.trim();
+  nombreJugador = nombreInput.value.trim();
+  if (!nombreJugador) return alert('Pon tu nombre');
+
+  const codigo = codigoInput.value.trim().toUpperCase();
   if (!codigo) return alert('Pon el código');
 
   const partidaRef = doc(db, 'partidas', codigo);
   const partidaSnap = await getDoc(partidaRef);
+
   if (!partidaSnap.exists()) return alert('Partida no encontrada');
 
   const partidaData = partidaSnap.data();
-  mazo = partidaData.mazo;
-  mano = repartirCartas(mazo,5);
-  campos = [[],[],[]];
+
+  // Reconstruir cartas desde nombres
+  mazo = partidaData.mazo.map(n => reconstruirCarta(n));
+  mano = repartirCartas(mazo, 5);
+  campos = [[], [], []];
+
   renderMano();
   renderCampos();
 
   await updateDoc(partidaRef, {
-    jugadores: arrayUnion({nombre: nombreJugador, mano, campos})
+    jugadores: arrayUnion({ nombre: nombreJugador, mano: mano.map(c => c.nombre), campos })
   });
+
   codigoContainer.textContent = `Te uniste a la partida ${codigo}`;
 });
