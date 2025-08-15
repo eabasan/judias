@@ -1,33 +1,33 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Juego de Judías</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <title>Juego de Judías</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Juego de Judías</h1>
-  
-  <div id="login">
-    <input id="nombre" placeholder="Tu nombre">
-    <button id="guardarNombre">Guardar nombre</button>
-  </div>
+  <h1>Bienvenido al juego de Judías</h1>
+
+  <input type="text" id="nombre" placeholder="Tu nombre">
+  <button id="guardarNombre">Guardar nombre</button>
 
   <div id="opciones" style="display:none;">
     <button id="crearPartida">Crear partida</button>
-    <input id="codigo" placeholder="Código de partida">
     <button id="unirsePartida">Unirse a partida</button>
+    <input type="text" id="codigo" placeholder="Código de la partida">
   </div>
 
   <div id="codigoPartidaContainer"></div>
 
-  <h3>Mano</h3>
+  <h3>Mano:</h3>
   <div id="manoContainer"></div>
 
-  <h3>Campos de cultivo</h3>
+  <h3>Campos:</h3>
   <div id="camposContainer"></div>
 
-  <script type="module" src="main.js"></script>
+  <h3>Jugadores en la partida:</h3>
+  <ul id="listaJugadores"></ul>
+
+  <script type="module" src="./main.js"></script>
 </body>
 </html>

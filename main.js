@@ -1,27 +1,23 @@
 import { crearMazo, repartirCartas } from './mazo.js';
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+import { getFirestore, doc, setDoc, updateDoc, arrayUnion, onSnapshot } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
 // Config Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyCA_tuTWdV8GJuzBbRgzOIyPszHR-kgpe4",
-  authDomain: "judias.firebaseapp.com",
-  projectId: "judias",
-  storageBucket: "judias.firebasestorage.app",
-  messagingSenderId: "1061180491958",
-  appId: "1:1061180491958:web:4bbd99457a56e58f34be17",
-  measurementId: "G-G3Y5NZWBEE"
+    apiKey: "AIzaSyCA_tuTWdV8GJuzBbRgzOIyPszHR-kgpe4",
+    authDomain: "judias.firebaseapp.com",
+    projectId: "judias",
+    storageBucket: "judias.appspot.com",
+    messagingSenderId: "1061180491958",
+    appId: "1:1061180491958:web:4bbd99457a56e58f34be17"
 };
-
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-let nombreJugador;
-let codigoPartida;
-let mano = [];
-let campos = [[], [], []]; // 3 campos
-let mazo = [];
+// Variables del juego
+let nombreJugador, codigoPartida, mano = [], campos = [[],[],[]], mazo = [];
 
+// Elementos DOM
 const nombreInput = document.getElementById('nombre');
 const guardarNombreBtn = document.getElementById('guardarNombre');
 const opcionesDiv = document.getElementById('opciones');
@@ -31,118 +27,120 @@ const codigoInput = document.getElementById('codigo');
 const codigoContainer = document.getElementById('codigoPartidaContainer');
 const manoContainer = document.getElementById('manoContainer');
 const camposContainer = document.getElementById('camposContainer');
+const listaJugadores = document.getElementById('listaJugadores');
 
 // Guardar nombre
 guardarNombreBtn.addEventListener('click', () => {
-  const nombre = nombreInput.value.trim();
-  if (!nombre) return alert('Pon tu nombre');
-  nombreJugador = nombre;
-  alert(`Nombre guardado: ${nombreJugador}`);
-  opcionesDiv.style.display = 'block';
+    const nombre = nombreInput.value.trim();
+    if(!nombre) return alert("Introduce tu nombre");
+    nombreJugador = nombre;
+    alert("Nombre guardado: " + nombreJugador);
+    opcionesDiv.style.display = 'block';
 });
 
-// Generar código aleatorio
+// Generar código
 function generarCodigo() {
-  return Math.random().toString(36).substr(2, 5).toUpperCase();
+    return Math.random().toString(36).substr(2,5).toUpperCase();
 }
 
-// Renderizar mano
+// Render mano
 function renderMano() {
-  manoContainer.innerHTML = '';
-  mano.forEach((carta, index) => {
-    const div = document.createElement('div');
-    div.className = `carta ${carta.nombre.toLowerCase().replace(/ /g,'-')}`;
-    div.textContent = carta.nombre;
-    div.addEventListener('click', () => plantarCarta(index));
-    manoContainer.appendChild(div);
-  });
+    manoContainer.innerHTML = '';
+    mano.forEach((carta, i) => {
+        const div = document.createElement('div');
+        div.className = `carta ${carta.nombre.toLowerCase()}`;
+        div.textContent = carta.nombre;
+        div.addEventListener('click', () => plantarCarta(i));
+        manoContainer.appendChild(div);
+    });
 }
 
-// Renderizar campos
+// Render campos
 function renderCampos() {
-  camposContainer.innerHTML = '';
-  const jugadorDiv = document.createElement('div');
-  jugadorDiv.className = 'jugador';
-  const nombreP = document.createElement('p');
-  nombreP.textContent = nombreJugador;
-  jugadorDiv.appendChild(nombreP);
-
-  const camposDiv = document.createElement('div');
-  camposDiv.className = 'campos';
-  campos.forEach(campo => {
-    const campoDiv = document.createElement('div');
-    campoDiv.className = 'campo';
-    campo.forEach(c => {
-      const cartaDiv = document.createElement('div');
-      cartaDiv.className = `carta ${c.nombre.toLowerCase().replace(/ /g,'-')}`;
-      cartaDiv.textContent = c.nombre;
-      campoDiv.appendChild(cartaDiv);
+    camposContainer.innerHTML = '';
+    campos.forEach((campo,i) => {
+        const div = document.createElement('div');
+        div.className = 'campo';
+        campo.forEach(c => {
+            const cartaDiv = document.createElement('div');
+            cartaDiv.textContent = c.nombre;
+            cartaDiv.className = `carta ${c.nombre.toLowerCase()}`;
+            div.appendChild(cartaDiv);
+        });
+        camposContainer.appendChild(div);
     });
-    camposDiv.appendChild(campoDiv);
-  });
-  jugadorDiv.appendChild(camposDiv);
-  camposContainer.appendChild(jugadorDiv);
 }
 
 // Plantar carta
-function plantarCarta(indiceCarta) {
-  const carta = mano[indiceCarta];
-  let planted = false;
-  for (let i = 0; i < 3; i++) {
-    if (campos[i].length === 0 || campos[i][0].nombre === carta.nombre) {
-      campos[i].push(carta);
-      planted = true;
-      break;
+function plantarCarta(i) {
+    const carta = mano[i];
+    let planted = false;
+    for(let j=0;j<3;j++){
+        if(campos[j].length === 0 || campos[j][0].nombre === carta.nombre){
+            campos[j].push(carta);
+            planted = true;
+            break;
+        }
     }
-  }
-  if (planted) {
-    mano.splice(indiceCarta,1);
-    renderMano();
-    renderCampos();
-  } else {
-    alert('No puedes plantar esta judía en ningún campo.');
-  }
+    if(planted){
+        mano.splice(i,1);
+        renderMano();
+        renderCampos();
+    } else {
+        alert('No puedes plantar esta judía en ningún campo.');
+    }
 }
 
 // Crear partida
 crearBtn.addEventListener('click', async () => {
-  codigoPartida = generarCodigo();
-  mazo = crearMazo();
-  mano = repartirCartas(mazo,5);
-  campos = [[],[],[]];
-  renderMano();
-  renderCampos();
-  codigoContainer.textContent = `Código de partida: ${codigoPartida}`;
+    codigoPartida = generarCodigo();
+    mazo = crearMazo();
+    mano = repartirCartas(mazo,5);
+    campos = [[],[],[]];
+    renderMano();
+    renderCampos();
+    codigoContainer.textContent = `Código de partida: ${codigoPartida}`;
 
-  try {
-    await setDoc(doc(db, 'partidas', codigoPartida), {
-      jugadores: [{nombre: nombreJugador, mano, campos}],
-      mazo
+    await setDoc(doc(db,'partidas',codigoPartida), {
+        jugadores: [{ nombre: nombreJugador, mano, campos }],
+        mazo
     });
-    alert(`Partida creada. Código: ${codigoPartida}`);
-  } catch(e) {
-    console.error(e);
-  }
+
+    // Escuchar la partida en tiempo real
+    onSnapshot(doc(db,'partidas',codigoPartida), snapshot => {
+        if(snapshot.exists()){
+            const data = snapshot.data();
+            listaJugadores.innerHTML = '';
+            data.jugadores.forEach(j => {
+                const li = document.createElement('li');
+                li.textContent = j.nombre;
+                listaJugadores.appendChild(li);
+            });
+        }
+    });
 });
 
 // Unirse a partida
 unirseBtn.addEventListener('click', async () => {
-  const codigo = codigoInput.value.trim();
-  if (!codigo) return alert('Pon el código de la partida');
+    const codigo = codigoInput.value.trim();
+    if(!codigo) return alert('Introduce el código de la partida');
+    codigoPartida = codigo;
 
-  const partidaRef = doc(db, 'partidas', codigo);
-  const partidaSnap = await getDoc(partidaRef);
-  if (!partidaSnap.exists()) return alert('Partida no encontrada');
+    const partidaRef = doc(db,'partidas',codigo);
+    await updateDoc(partidaRef, {
+        jugadores: arrayUnion({ nombre: nombreJugador, mano, campos })
+    });
 
-  const partidaData = partidaSnap.data();
-  mazo = partidaData.mazo;
-  mano = repartirCartas(mazo,5);
-  campos = [[],[],[]];
-  renderMano();
-  renderCampos();
-
-  await updateDoc(partidaRef, {
-    jugadores: arrayUnion({nombre: nombreJugador, mano, campos})
-  });
-  codigoContainer.textContent = `Te uniste a la partida ${codigo}`;
+    // Escuchar cambios en tiempo real
+    onSnapshot(partidaRef, snapshot => {
+        if(snapshot.exists()){
+            const data = snapshot.data();
+            listaJugadores.innerHTML = '';
+            data.jugadores.forEach(j => {
+                const li = document.createElement('li');
+                li.textContent = j.nombre;
+                listaJugadores.appendChild(li);
+            });
+        }
+    });
 });
