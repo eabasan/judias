@@ -56,7 +56,6 @@ ul {
 .el-judicultor { background-color: #ff9966; }
 .hippy-judía { background-color: #32CD32; } /* verde distinto de La Pocha */
 
-/* Campo de cultivo */
 #campo {
   display: flex;
   justify-content: center;
@@ -64,12 +63,13 @@ ul {
 }
 
 .hueco {
-  width: 120px;
-  height: 160px;
-  border: 2px dashed #aaa;
-  margin: 10px;
+  width: 130px;
+  height: 170px;
+  border: 2px dashed #fff;
   border-radius: 10px;
+  margin: 0 10px;
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
+  background-color: #333; /* contraste con las cartas */
 }
