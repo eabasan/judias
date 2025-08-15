@@ -8,27 +8,20 @@
 <body>
   <h1>Juego de Judías</h1>
 
-  <!-- Guardar nombre -->
-  <label>Tu nombre: <input type="text" id="nombre" /></label>
-  <button id="guardarNombre">Guardar nombre</button>
-  <hr>
+  <div id="registro">
+    <input type="text" id="nombre" placeholder="Tu nombre">
+    <button id="crearPartida">Crear Partida</button>
+    <br>
+    <input type="text" id="codigo" placeholder="Código de la partida">
+    <button id="unirsePartida">Unirse a Partida</button>
+  </div>
 
-  <!-- Crear o unirse a partida -->
-  <button id="crearPartida">Crear partida</button>
-  <input type="text" id="codigoPartida" placeholder="Código para unirse">
-  <button id="unirsePartida">Unirse a partida</button>
+  <h2>Mano</h2>
+  <div id="manoContainer" class="cartas-container"></div>
 
-  <h3>Jugadores en la partida:</h3>
-  <ul id="listaJugadores"></ul>
-
-  <h3>Campos de cultivo:</h3>
+  <h2>Campos</h2>
   <div id="camposContainer"></div>
 
-  <h3>Cartas del jugador:</h3>
-  <div id="cartasJugador" class="cartas-container"></div>
-
-  <!-- Scripts -->
-  <script type="module" src="./mazo.js"></script>
-  <script type="module" src="./main.js"></script>
+  <script type="module" src="main.js"></script>
 </body>
 </html>
