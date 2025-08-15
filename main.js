@@ -2,35 +2,48 @@ import { crearMazo, repartirCartas } from './mazo.js';
 
 let mazo = [];
 let jugadores = {};
-let turno = 0;
+let partidaIniciada = false;
 
 const manoContainer = document.getElementById('mano');
 const contenedorJugadores = document.getElementById('contenedor-jugadores');
 const crearPartidaBtn = document.getElementById('crear-partida');
+const unirsePartidaBtn = document.getElementById('unirse-partida');
 const nombreJugadorInput = document.getElementById('nombre-jugador');
 
 crearPartidaBtn.addEventListener('click', () => {
   const nombre = nombreJugadorInput.value.trim();
   if (!nombre) return alert("Introduce un nombre");
-  if (jugadores[nombre]) return alert("Ya existe un jugador con ese nombre");
-
-  if (Object.keys(jugadores).length === 0) {
-    mazo = crearMazo(); // Solo crear mazo al iniciar
-  }
-
+  if (partidaIniciada) return alert("La partida ya ha sido creada");
+  
+  // Crear mazo y primer jugador
+  mazo = crearMazo();
   jugadores[nombre] = {
     mano: repartirCartas(mazo, 5),
-    campos: [[], [], []] // 3 campos vacíos
+    campos: [[], [], []]
   };
-
+  partidaIniciada = true;
   mostrarCampos(jugadores);
   mostrarMano(nombre);
   nombreJugadorInput.value = "";
 });
 
+unirsePartidaBtn.addEventListener('click', () => {
+  const nombre = nombreJugadorInput.value.trim();
+  if (!nombre) return alert("Introduce un nombre");
+  if (!partidaIniciada) return alert("Primero crea la partida");
+  if (jugadores[nombre]) return alert("Ya existe un jugador con ese nombre");
+
+  jugadores[nombre] = {
+    mano: repartirCartas(mazo, 5),
+    campos: [[], [], []]
+  };
+  mostrarCampos(jugadores);
+  mostrarMano(nombre); // Cada jugador ve su mano
+  nombreJugadorInput.value = "";
+});
+
 function mostrarCampos(todosLosCampos) {
   contenedorJugadores.innerHTML = "";
-
   for (const jugador in todosLosCampos) {
     const divJugador = document.createElement("div");
     divJugador.classList.add("jugador");
@@ -39,8 +52,7 @@ function mostrarCampos(todosLosCampos) {
     h4.textContent = jugador;
     divJugador.appendChild(h4);
 
-    // 3 campos
-    todosLosCampos[jugador].campos.forEach((campo) => {
+    todosLosCampos[jugador].campos.forEach(campo => {
       const campoDiv = document.createElement("div");
       campoDiv.classList.add("campo");
 
@@ -77,7 +89,7 @@ function plantarCarta(nombreJugador, indiceCarta) {
   const jugador = jugadores[nombreJugador];
   const carta = jugador.mano[indiceCarta];
 
-  // Plantar en primer campo disponible (puedes mejorar la lógica)
+  // Plantar en primer campo disponible (igual tipo o vacío)
   for (let campo of jugador.campos) {
     if (campo.length === 0 || campo[0].nombre === carta.nombre) {
       campo.push(carta);
