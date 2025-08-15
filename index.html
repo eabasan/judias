@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Juego de Judías</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <h1>Bienvenido al juego de Judías</h1>
@@ -21,14 +22,13 @@
   <ul id="listaJugadores"></ul>
 
   <h3>Cartas del jugador:</h3>
-  <ul id="cartasJugador"></ul>
+  <ul id="cartasJugador" class="cartas"></ul>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
     import { getFirestore, doc, setDoc, onSnapshot, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
     import { crearMazo, repartirCartas } from './mazo.js';
 
-    // Configuración de Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyCA_tuTWdV8GJuzBbRgzOIyPszHR-kgpe4",
       authDomain: "judias.firebaseapp.com",
@@ -49,7 +49,7 @@
 
     // Guardar nombre
     document.getElementById("guardarNombre").onclick = () => {
-      nombreJugador = document.getElementById("nombre").value;
+      nombreJugador = document.getElementById("nombre").value.trim();
       if(!nombreJugador) return alert("Introduce tu nombre");
       alert("Nombre guardado: " + nombreJugador);
     }
@@ -97,9 +97,11 @@
 
       const listaCartas = document.getElementById("cartasJugador");
       listaCartas.innerHTML = "";
+
       manoJugador.forEach(carta => {
         const li = document.createElement("li");
         li.textContent = carta.nombre;
+        li.classList.add("carta", "judia-" + carta.idClase); // asigna color según tipo
         listaCartas.appendChild(li);
       });
 
@@ -107,8 +109,5 @@
       console.log("Mano del jugador:", manoJugador);
     }
   </script>
-
-  <!-- Cargar módulo de mazo -->
-  <script type="module" src="./mazo.js"></script>
 </body>
 </html>
