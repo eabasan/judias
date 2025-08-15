@@ -22,14 +22,20 @@
   <ul id="listaJugadores"></ul>
 
   <h3>Cartas del jugador:</h3>
-  <div id="cartasJugador" class="cartas-container"></div>
+  <ul id="cartasJugador"></ul>
+
+  <h3>Campo de cultivo:</h3>
+  <div id="campo">
+    <div class="hueco" data-pos="0"></div>
+    <div class="hueco" data-pos="1"></div>
+    <div class="hueco" data-pos="2"></div>
+  </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
     import { getFirestore, doc, setDoc, onSnapshot, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
     import { crearMazo, repartirCartas } from './mazo.js';
 
-    // Configuración Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyCA_tuTWdV8GJuzBbRgzOIyPszHR-kgpe4",
       authDomain: "judias.firebaseapp.com",
@@ -91,24 +97,63 @@
       });
     }
 
-    // Iniciar juego: crear mazo y repartir mano
+    // Mapear nombres a clases CSS
+    const clasesJudias = {
+      "Judía Boom": "judía-boom",
+      "La Pocha": "la-pocha",
+      "Judía Colorá": "judía-colorá",
+      "La Pestosa": "la-pestosa",
+      "Rocky Judía": "rocky-judía",
+      "Judía Bill": "judía-bill",
+      "El Judicultor": "el-judicultor",
+      "Hippy Judía": "hippy-judía"
+    };
+
+    // Iniciar juego
     function iniciarJuego() {
       mazo = crearMazo();
       manoJugador = repartirCartas(mazo, 5);
+      mostrarMano();
+      configurarCampo();
+    }
 
-      const contenedorCartas = document.getElementById("cartasJugador");
-      contenedorCartas.innerHTML = "";
-      manoJugador.forEach(carta => {
-        const div = document.createElement("div");
-        div.classList.add("carta");
-        // Color según nombre de judía
-        div.classList.add(carta.nombre.toLowerCase().replace(/ /g, '-'));
-        div.textContent = carta.nombre;
-        contenedorCartas.appendChild(div);
+    // Mostrar la mano del jugador
+    function mostrarMano() {
+      const listaCartas = document.getElementById("cartasJugador");
+      listaCartas.innerHTML = "";
+      manoJugador.forEach((carta, index) => {
+        const li = document.createElement("li");
+        li.textContent = carta.nombre;
+        li.className = `carta ${clasesJudias[carta.nombre]}`;
+        li.dataset.index = index;
+        li.onclick = () => plantarCarta(index);
+        listaCartas.appendChild(li);
       });
+    }
 
-      console.log("Mazo restante:", mazo);
-      console.log("Mano del jugador:", manoJugador);
+    // Configurar campo de cultivo
+    function configurarCampo() {
+      const huecos = document.querySelectorAll(".hueco");
+      huecos.forEach(hueco => hueco.innerHTML = ""); // limpiar
+    }
+
+    // Plantar carta
+    function plantarCarta(indiceMano) {
+      const carta = manoJugador[indiceMano];
+      const huecos = document.querySelectorAll(".hueco");
+      // Buscar primer hueco vacío
+      for (let h of huecos) {
+        if (h.children.length === 0) {
+          const divCarta = document.createElement("div");
+          divCarta.textContent = carta.nombre;
+          divCarta.className = `carta ${clasesJudias[carta.nombre]}`;
+          h.appendChild(divCarta);
+          // Quitar carta de la mano
+          manoJugador.splice(indiceMano,1);
+          mostrarMano();
+          break;
+        }
+      }
     }
   </script>
 </body>
