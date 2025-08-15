@@ -1,4 +1,4 @@
-import { crearMazo, repartirCartas, reconstruirCarta } from './mazo.js';
+import { crearMazo, repartirCartas } from './mazo.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
 import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
@@ -19,10 +19,12 @@ const db = getFirestore(app);
 let nombreJugador;
 let codigoPartida;
 let mano = [];
-let campos = [[], [], []]; // 3 campos por jugador
+let campos = [[], [], []]; // 3 campos
 let mazo = [];
 
 const nombreInput = document.getElementById('nombre');
+const guardarNombreBtn = document.getElementById('guardarNombre');
+const opcionesDiv = document.getElementById('opciones');
 const crearBtn = document.getElementById('crearPartida');
 const unirseBtn = document.getElementById('unirsePartida');
 const codigoInput = document.getElementById('codigo');
@@ -30,10 +32,21 @@ const codigoContainer = document.getElementById('codigoPartidaContainer');
 const manoContainer = document.getElementById('manoContainer');
 const camposContainer = document.getElementById('camposContainer');
 
+// Guardar nombre
+guardarNombreBtn.addEventListener('click', () => {
+  const nombre = nombreInput.value.trim();
+  if (!nombre) return alert('Pon tu nombre');
+  nombreJugador = nombre;
+  alert(`Nombre guardado: ${nombreJugador}`);
+  opcionesDiv.style.display = 'block';
+});
+
+// Generar código aleatorio
 function generarCodigo() {
   return Math.random().toString(36).substr(2, 5).toUpperCase();
 }
 
+// Renderizar mano
 function renderMano() {
   manoContainer.innerHTML = '';
   mano.forEach((carta, index) => {
@@ -45,6 +58,7 @@ function renderMano() {
   });
 }
 
+// Renderizar campos
 function renderCampos() {
   camposContainer.innerHTML = '';
   const jugadorDiv = document.createElement('div');
@@ -70,6 +84,7 @@ function renderCampos() {
   camposContainer.appendChild(jugadorDiv);
 }
 
+// Plantar carta
 function plantarCarta(indiceCarta) {
   const carta = mano[indiceCarta];
   let planted = false;
@@ -81,7 +96,7 @@ function plantarCarta(indiceCarta) {
     }
   }
   if (planted) {
-    mano.splice(indiceCarta, 1);
+    mano.splice(indiceCarta,1);
     renderMano();
     renderCampos();
   } else {
@@ -89,54 +104,45 @@ function plantarCarta(indiceCarta) {
   }
 }
 
+// Crear partida
 crearBtn.addEventListener('click', async () => {
-  nombreJugador = nombreInput.value.trim();
-  if (!nombreJugador) return alert('Pon tu nombre');
-
   codigoPartida = generarCodigo();
   mazo = crearMazo();
-  mano = repartirCartas(mazo, 5);
-  campos = [[], [], []];
+  mano = repartirCartas(mazo,5);
+  campos = [[],[],[]];
   renderMano();
   renderCampos();
   codigoContainer.textContent = `Código de partida: ${codigoPartida}`;
 
   try {
     await setDoc(doc(db, 'partidas', codigoPartida), {
-      jugadores: [{ nombre: nombreJugador, mano: mano.map(c => c.nombre), campos: [[], [], []] }],
-      mazo: mazo.map(c => c.nombre)
+      jugadores: [{nombre: nombreJugador, mano, campos}],
+      mazo
     });
+    alert(`Partida creada. Código: ${codigoPartida}`);
   } catch(e) {
     console.error(e);
-    alert('Error al crear partida');
   }
 });
 
+// Unirse a partida
 unirseBtn.addEventListener('click', async () => {
-  nombreJugador = nombreInput.value.trim();
-  if (!nombreJugador) return alert('Pon tu nombre');
-
-  const codigo = codigoInput.value.trim().toUpperCase();
-  if (!codigo) return alert('Pon el código');
+  const codigo = codigoInput.value.trim();
+  if (!codigo) return alert('Pon el código de la partida');
 
   const partidaRef = doc(db, 'partidas', codigo);
   const partidaSnap = await getDoc(partidaRef);
-
   if (!partidaSnap.exists()) return alert('Partida no encontrada');
 
   const partidaData = partidaSnap.data();
-
-  // Reconstruir cartas desde nombres
-  mazo = partidaData.mazo.map(n => reconstruirCarta(n));
-  mano = repartirCartas(mazo, 5);
-  campos = [[], [], []];
-
+  mazo = partidaData.mazo;
+  mano = repartirCartas(mazo,5);
+  campos = [[],[],[]];
   renderMano();
   renderCampos();
 
   await updateDoc(partidaRef, {
-    jugadores: arrayUnion({ nombre: nombreJugador, mano: mano.map(c => c.nombre), campos })
+    jugadores: arrayUnion({nombre: nombreJugador, mano, campos})
   });
-
   codigoContainer.textContent = `Te uniste a la partida ${codigo}`;
 });
