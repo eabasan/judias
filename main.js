@@ -4,12 +4,13 @@ import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion } from "https:
 
 // Config Firebase (pon la tuya)
 const firebaseConfig = {
-  apiKey: "TU_API_KEY",
-  authDomain: "TU_AUTH_DOMAIN",
-  projectId: "TU_PROJECT_ID",
-  storageBucket: "TU_STORAGE_BUCKET",
-  messagingSenderId: "TU_SENDER_ID",
-  appId: "TU_APP_ID"
+  apiKey: "AIzaSyCA_tuTWdV8GJuzBbRgzOIyPszHR-kgpe4",
+      authDomain: "judias.firebaseapp.com",
+      projectId: "judias",
+      storageBucket: "judias.firebasestorage.app",
+      messagingSenderId: "1061180491958",
+      appId: "1:1061180491958:web:4bbd99457a56e58f34be17",
+      measurementId: "G-G3Y5NZWBEE"
 };
 
 const app = initializeApp(firebaseConfig);
