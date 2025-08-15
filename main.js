@@ -15,6 +15,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// ... mantén las importaciones y configuración de Firebase igual ...
+
 let nombreJugador = "";
 let idPartida = "";
 let mazo = [];
@@ -28,12 +30,20 @@ document.getElementById("guardarNombre").onclick = () => {
 
 document.getElementById("crearPartida").onclick = async () => {
   if(!nombreJugador) return alert("Primero guarda tu nombre");
+
+  // Generar código de 5 caracteres
   idPartida = Math.random().toString(36).substring(2,7).toUpperCase();
+
+  // Guardar partida en Firestore
   await setDoc(doc(db, "partidas", idPartida), { 
     jugadores: [nombreJugador],
     campos: { [nombreJugador]: [[],[],[]] } 
   });
-  alert("Partida creada. Código: " + idPartida);
+
+  // Mostrar código de partida en pantalla
+  alert("Partida creada. Código para que otros se unan: " + idPartida);
+  document.getElementById("codigoPartida").value = idPartida;
+
   mazo = crearMazo();
   manoJugador = repartirCartas(mazo, 5);
   renderMano();
@@ -42,19 +52,29 @@ document.getElementById("crearPartida").onclick = async () => {
 
 document.getElementById("unirsePartida").onclick = async () => {
   if(!nombreJugador) return alert("Primero guarda tu nombre");
+
   idPartida = document.getElementById("codigoPartida").value.trim().toUpperCase();
+  if(!idPartida) return alert("Introduce un código de partida");
+
   const partidaRef = doc(db, "partidas", idPartida);
   const snap = await getDoc(partidaRef);
   if(!snap.exists()) return alert("Código de partida no válido");
+
+  // Añadir jugador a la partida
   await updateDoc(partidaRef, { 
     jugadores: arrayUnion(nombreJugador),
     [`campos.${nombreJugador}`]: [[],[],[]]
   });
+
+  alert("¡Te has unido a la partida!");
   mazo = crearMazo();
   manoJugador = repartirCartas(mazo,5);
   renderMano();
   escucharPartida();
 };
+
+// ... resto del código (renderMano, renderCampos, plantarCarta, escucharPartida) queda igual ...
+
 
 function renderMano() {
   const container = document.getElementById("cartasJugador");
