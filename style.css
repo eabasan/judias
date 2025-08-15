@@ -1,5 +1,5 @@
 body {
-  background-color: #222; /* fondo oscuro */
+  background-color: #333;
   color: #fff;
   font-family: Arial, sans-serif;
   text-align: center;
@@ -14,7 +14,7 @@ input, button {
 }
 
 h1, h3 {
-  color: #ffeb3b; /* títulos en amarillo */
+  color: #ffeb3b;
 }
 
 ul {
@@ -22,14 +22,14 @@ ul {
   padding: 0;
 }
 
-.cartas-container, #cartasJugador {
+.cartas-container {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   margin-top: 10px;
 }
 
-.carta, #cartasJugador li {
+.carta {
   width: 120px;
   height: 160px;
   margin: 10px;
@@ -46,30 +46,34 @@ ul {
   cursor: pointer;
 }
 
+.campo {
+  display: flex;
+  justify-content: center;
+  margin: 10px;
+  gap: 10px;
+}
+
+.campo div {
+  width: 130px;
+  min-height: 170px;
+  background-color: #555;
+  border-radius: 10px;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.campo h4 {
+  margin: 5px 0;
+}
+
 /* Colores por judía */
 .judía-boom { background-color: #ff6666; }
-.la-pocha { background-color: #228B22; } /* verde más oscuro */
+.la-pocha { background-color: #339900; }
 .judía-colorá { background-color: #ffcc66; }
 .la-pestosa { background-color: #66ccff; }
 .rocky-judía { background-color: #ff66ff; }
 .judía-bill { background-color: #66ffff; }
 .el-judicultor { background-color: #ff9966; }
-.hippy-judía { background-color: #32CD32; } /* verde distinto de La Pocha */
-
-#campo {
-  display: flex;
-  justify-content: center;
-  margin-top: 20px;
-}
-
-.hueco {
-  width: 130px;
-  height: 170px;
-  border: 2px dashed #fff;
-  border-radius: 10px;
-  margin: 0 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #333; /* contraste con las cartas */
-}
+.hippy-judía { background-color: #33cc33; } /* verde distinto */

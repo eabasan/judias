@@ -6,14 +6,12 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Bienvenido al juego de Judías</h1>
+  <h1>Juego de Judías</h1>
 
-  <!-- Guardar nombre -->
   <label>Tu nombre: <input type="text" id="nombre" /></label>
   <button id="guardarNombre">Guardar nombre</button>
   <hr>
 
-  <!-- Crear o unirse a partida -->
   <button id="crearPartida">Crear partida</button>
   <input type="text" id="codigoPartida" placeholder="Código para unirse">
   <button id="unirsePartida">Unirse a partida</button>
@@ -21,15 +19,11 @@
   <h3>Jugadores en la partida:</h3>
   <ul id="listaJugadores"></ul>
 
-  <h3>Cartas del jugador:</h3>
-  <ul id="cartasJugador"></ul>
+  <h3>Campos de cultivo:</h3>
+  <div id="camposContainer"></div>
 
-  <h3>Campo de cultivo:</h3>
-  <div id="campo">
-    <div class="hueco" data-pos="0"></div>
-    <div class="hueco" data-pos="1"></div>
-    <div class="hueco" data-pos="2"></div>
-  </div>
+  <h3>Tu mano:</h3>
+  <div class="cartas-container" id="cartasJugador"></div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
@@ -53,108 +47,113 @@
     let idPartida = "";
     let mazo = [];
     let manoJugador = [];
+    let campos = [[],[],[]];
 
-    // Guardar nombre
     document.getElementById("guardarNombre").onclick = () => {
       nombreJugador = document.getElementById("nombre").value;
       if(!nombreJugador) return alert("Introduce tu nombre");
       alert("Nombre guardado: " + nombreJugador);
     }
 
-    // Crear partida
     document.getElementById("crearPartida").onclick = async () => {
-      if(!nombreJugador) { alert("Primero guarda tu nombre"); return; }
-      idPartida = Math.random().toString(36).substring(2, 7).toUpperCase();
-      await setDoc(doc(db, "partidas", idPartida), { jugadores: [nombreJugador] });
-      alert("Partida creada. Código: " + idPartida);
-      escucharJugadores();
-      iniciarJuego();
+      if(!nombreJugador) return alert("Guarda tu nombre");
+      idPartida = Math.random().toString(36).substring(2,7).toUpperCase();
+      mazo = crearMazo();
+      await setDoc(doc(db,"partidas",idPartida),{
+        jugadores: [nombreJugador],
+        campos: { [nombreJugador]: [[],[],[]] },
+        mano: { [nombreJugador]: repartirCartas(mazo,5) },
+        mazo: mazo
+      });
+      alert("Partida creada. Código: "+idPartida);
+      escucharPartida();
     }
 
-    // Unirse a partida
     document.getElementById("unirsePartida").onclick = async () => {
-      if(!nombreJugador) { alert("Primero guarda tu nombre"); return; }
+      if(!nombreJugador) return alert("Guarda tu nombre");
       idPartida = document.getElementById("codigoPartida").value.toUpperCase();
-      const partidaRef = doc(db, "partidas", idPartida);
-      await updateDoc(partidaRef, { jugadores: arrayUnion(nombreJugador) });
-      escucharJugadores();
-      iniciarJuego();
+      const partidaRef = doc(db,"partidas",idPartida);
+      await updateDoc(partidaRef,{ jugadores: arrayUnion(nombreJugador) });
+      escucharPartida();
     }
 
-    // Escuchar cambios en jugadores
-    function escucharJugadores() {
-      const partidaRef = doc(db, "partidas", idPartida);
-      onSnapshot(partidaRef, (docSnap) => {
+    function escucharPartida() {
+      const partidaRef = doc(db,"partidas",idPartida);
+      onSnapshot(partidaRef, (docSnap)=>{
+        if(!docSnap.exists()) return;
+        const data = docSnap.data();
+
+        // actualizar lista de jugadores
         const lista = document.getElementById("listaJugadores");
         lista.innerHTML = "";
-        if(docSnap.exists()) {
-          docSnap.data().jugadores.forEach(j => {
-            const li = document.createElement("li");
-            li.textContent = j;
-            lista.appendChild(li);
+        data.jugadores.forEach(j=>{
+          const li = document.createElement("li");
+          li.textContent = j;
+          lista.appendChild(li);
+        });
+
+        // actualizar campos de todos
+        const contenedor = document.getElementById("camposContainer");
+        contenedor.innerHTML = "";
+        data.jugadores.forEach(j=>{
+          const jugadorCampos = data.campos[j] || [[],[],[]];
+          const divJugador = document.createElement("div");
+          divJugador.innerHTML = `<h4>${j}</h4>`;
+          const divCampos = document.createElement("div");
+          divCampos.classList.add("campo");
+          jugadorCampos.forEach((campo,index)=>{
+            const campoDiv = document.createElement("div");
+            campo.forEach(c=>{
+              const cDiv = document.createElement("div");
+              cDiv.textContent = c.nombre;
+              cDiv.className = "carta "+c.nombre.toLowerCase().replace(/\s/g,'-');
+              campoDiv.appendChild(cDiv);
+            });
+            divCampos.appendChild(campoDiv);
           });
-        }
+          divJugador.appendChild(divCampos);
+          contenedor.appendChild(divJugador);
+        });
+
+        // actualizar mano del jugador
+        manoJugador = data.mano[nombreJugador] || [];
+        const manoDiv = document.getElementById("cartasJugador");
+        manoDiv.innerHTML = "";
+        manoJugador.forEach((carta,i)=>{
+          const li = document.createElement("div");
+          li.textContent = carta.nombre;
+          li.className = "carta "+carta.nombre.toLowerCase().replace(/\s/g,'-');
+          li.onclick = ()=>plantarCarta(i);
+          manoDiv.appendChild(li);
+        });
       });
     }
 
-    // Mapear nombres a clases CSS
-    const clasesJudias = {
-      "Judía Boom": "judía-boom",
-      "La Pocha": "la-pocha",
-      "Judía Colorá": "judía-colorá",
-      "La Pestosa": "la-pestosa",
-      "Rocky Judía": "rocky-judía",
-      "Judía Bill": "judía-bill",
-      "El Judicultor": "el-judicultor",
-      "Hippy Judía": "hippy-judía"
-    };
+    async function plantarCarta(indice) {
+      const carta = manoJugador[indice];
+      const campoIndex = prompt("En qué campo plantar? 0, 1 o 2");
+      if(campoIndex === null) return;
+      const campoNum = parseInt(campoIndex);
+      if(campoNum<0 || campoNum>2) return alert("Campo inválido");
 
-    // Iniciar juego
-    function iniciarJuego() {
-      mazo = crearMazo();
-      manoJugador = repartirCartas(mazo, 5);
-      mostrarMano();
-      configurarCampo();
-    }
+      const partidaRef = doc(db,"partidas",idPartida);
+      const docSnap = await partidaRef.get();
+      const data = docSnap.data();
+      const jugadorCampos = data.campos[nombreJugador];
 
-    // Mostrar la mano del jugador
-    function mostrarMano() {
-      const listaCartas = document.getElementById("cartasJugador");
-      listaCartas.innerHTML = "";
-      manoJugador.forEach((carta, index) => {
-        const li = document.createElement("li");
-        li.textContent = carta.nombre;
-        li.className = `carta ${clasesJudias[carta.nombre]}`;
-        li.dataset.index = index;
-        li.onclick = () => plantarCarta(index);
-        listaCartas.appendChild(li);
-      });
-    }
-
-    // Configurar campo de cultivo
-    function configurarCampo() {
-      const huecos = document.querySelectorAll(".hueco");
-      huecos.forEach(hueco => hueco.innerHTML = ""); // limpiar
-    }
-
-    // Plantar carta
-    function plantarCarta(indiceMano) {
-      const carta = manoJugador[indiceMano];
-      const huecos = document.querySelectorAll(".hueco");
-      // Buscar primer hueco vacío
-      for (let h of huecos) {
-        if (h.children.length === 0) {
-          const divCarta = document.createElement("div");
-          divCarta.textContent = carta.nombre;
-          divCarta.className = `carta ${clasesJudias[carta.nombre]}`;
-          h.appendChild(divCarta);
-          // Quitar carta de la mano
-          manoJugador.splice(indiceMano,1);
-          mostrarMano();
-          break;
-        }
+      // si el campo está vacío o coincide tipo
+      if(jugadorCampos[campoNum].length===0 || jugadorCampos[campoNum][0].nombre===carta.nombre){
+        jugadorCampos[campoNum].push(carta);
+        data.mano[nombreJugador].splice(indice,1);
+        await updateDoc(partidaRef,{
+          [`campos.${nombreJugador}`]: jugadorCampos,
+          [`mano.${nombreJugador}`]: data.mano[nombreJugador]
+        });
+      } else {
+        alert("El tipo de judía no coincide, debes vender otro campo primero");
       }
     }
+
   </script>
 </body>
 </html>
