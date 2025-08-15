@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Juego de Judías</title>
+</head>
+<body>
+  <h1>Bienvenido al juego</h1>
+
+  <label>Tu nombre: <input type="text" id="nombre" /></label>
+  <button id="guardarNombre">Guardar nombre</button>
+  <hr>
+  <button id="crearPartida">Crear partida</button>
+  <input type="text" id="codigoPartida" placeholder="Código para unirse">
+  <button id="unirsePartida">Unirse a partida</button>
+
+  <h3>Jugadores en la partida:</h3>
+  <ul id="listaJugadores"></ul>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+    import { getFirestore, doc, setDoc, onSnapshot, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+
+    // Pega aquí tu configuración de Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyCA_tuTWdV8GJuzBbRgzOIyPszHR-kgpe4",
+      authDomain: "judias.firebaseapp.com",
+      projectId: "judias",
+      storageBucket: "judias.firebasestorage.app",
+      messagingSenderId: "1061180491958",
+      appId: "1:1061180491958:web:4bbd99457a56e58f34be17",
+      measurementId: "G-G3Y5NZWBEE"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let nombreJugador = "";
+    let idPartida = "";
+
+    document.getElementById("guardarNombre").onclick = () => {
+      nombreJugador = document.getElementById("nombre").value;
+      alert("Nombre guardado: " + nombreJugador);
+    }
+
+    // Crear partida
+    document.getElementById("crearPartida").onclick = async () => {
+      if(!nombreJugador) { alert("Primero guarda tu nombre"); return; }
+      idPartida = Math.random().toString(36).substring(2, 7).toUpperCase();
+      await setDoc(doc(db, "partidas", idPartida), { jugadores: [nombreJugador] });
+      alert("Partida creada. Código: " + idPartida);
+      escucharJugadores();
+    }
+
+    // Unirse a partida
+    document.getElementById("unirsePartida").onclick = async () => {
+      if(!nombreJugador) { alert("Primero guarda tu nombre"); return; }
+      idPartida = document.getElementById("codigoPartida").value.toUpperCase();
+      const partidaRef = doc(db, "partidas", idPartida);
+      await updateDoc(partidaRef, { jugadores: arrayUnion(nombreJugador) });
+      escucharJugadores();
+    }
+
+    // Escuchar cambios en jugadores
+    function escucharJugadores() {
+      const partidaRef = doc(db, "partidas", idPartida);
+      onSnapshot(partidaRef, (docSnap) => {
+        const lista = document.getElementById("listaJugadores");
+        lista.innerHTML = "";
+        if(docSnap.exists()) {
+          docSnap.data().jugadores.forEach(j => {
+            const li = document.createElement("li");
+            li.textContent = j;
+            lista.appendChild(li);
+          });
+        }
+      });
+    }
+  </script>
+</body>
+</html>
