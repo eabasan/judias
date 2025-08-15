@@ -1,16 +1,16 @@
 import { crearMazo, repartirCartas } from './mazo.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
-// Config Firebase (pon la tuya)
+// Config Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyCA_tuTWdV8GJuzBbRgzOIyPszHR-kgpe4",
-      authDomain: "judias.firebaseapp.com",
-      projectId: "judias",
-      storageBucket: "judias.firebasestorage.app",
-      messagingSenderId: "1061180491958",
-      appId: "1:1061180491958:web:4bbd99457a56e58f34be17",
-      measurementId: "G-G3Y5NZWBEE"
+  authDomain: "judias.firebaseapp.com",
+  projectId: "judias",
+  storageBucket: "judias.firebasestorage.app",
+  messagingSenderId: "1061180491958",
+  appId: "1:1061180491958:web:4bbd99457a56e58f34be17",
+  measurementId: "G-G3Y5NZWBEE"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -45,29 +45,31 @@ function renderMano() {
   });
 }
 
-function renderCampos() {
+function renderCampos(jugadores) {
   camposContainer.innerHTML = '';
-  const jugadorDiv = document.createElement('div');
-  jugadorDiv.className = 'jugador';
-  const nombreP = document.createElement('p');
-  nombreP.textContent = nombreJugador;
-  jugadorDiv.appendChild(nombreP);
+  jugadores.forEach(jugador => {
+    const jugadorDiv = document.createElement('div');
+    jugadorDiv.className = 'jugador';
+    const nombreP = document.createElement('p');
+    nombreP.textContent = jugador.nombre;
+    jugadorDiv.appendChild(nombreP);
 
-  const camposDiv = document.createElement('div');
-  camposDiv.className = 'campos';
-  campos.forEach(campo => {
-    const campoDiv = document.createElement('div');
-    campoDiv.className = 'campo';
-    campo.forEach(c => {
-      const cartaDiv = document.createElement('div');
-      cartaDiv.className = `carta ${c.nombre.toLowerCase().replace(/ /g,'-')}`;
-      cartaDiv.textContent = c.nombre;
-      campoDiv.appendChild(cartaDiv);
+    const camposDiv = document.createElement('div');
+    camposDiv.className = 'campos';
+    jugador.campos.forEach(campo => {
+      const campoDiv = document.createElement('div');
+      campoDiv.className = 'campo';
+      campo.forEach(c => {
+        const cartaDiv = document.createElement('div');
+        cartaDiv.className = `carta ${c.nombre.toLowerCase().replace(/ /g,'-')}`;
+        cartaDiv.textContent = c.nombre;
+        campoDiv.appendChild(cartaDiv);
+      });
+      camposDiv.appendChild(campoDiv);
     });
-    camposDiv.appendChild(campoDiv);
+    jugadorDiv.appendChild(camposDiv);
+    camposContainer.appendChild(jugadorDiv);
   });
-  jugadorDiv.appendChild(camposDiv);
-  camposContainer.appendChild(jugadorDiv);
 }
 
 function plantarCarta(indiceCarta) {
@@ -84,10 +86,21 @@ function plantarCarta(indiceCarta) {
   if (planted) {
     mano.splice(indiceCarta,1);
     renderMano();
-    renderCampos();
+    actualizarCamposEnFirestore();
   } else {
     alert('No puedes plantar esta judía en ningún campo.');
   }
+}
+
+// Actualiza los campos del jugador en Firestore
+async function actualizarCamposEnFirestore() {
+  if (!codigoPartida) return;
+  const partidaRef = doc(db, 'partidas', codigoPartida);
+  const partidaSnap = await getDoc(partidaRef);
+  if (!partidaSnap.exists()) return;
+  const data = partidaSnap.data();
+  const jugadores = data.jugadores.map(j => j.nombre === nombreJugador ? {nombre: nombreJugador, mano, campos} : j);
+  await updateDoc(partidaRef, { jugadores });
 }
 
 crearBtn.addEventListener('click', async () => {
@@ -98,15 +111,15 @@ crearBtn.addEventListener('click', async () => {
   mano = repartirCartas(mazo,5);
   campos = [[],[],[]];
   renderMano();
-  renderCampos();
+  renderCampos([{nombre: nombreJugador, campos}]);
   codigoContainer.textContent = `Código de partida: ${codigoPartida}`;
 
-  // Crear partida en Firestore
   try {
     await setDoc(doc(db, 'partidas', codigoPartida), {
       jugadores: [{nombre: nombreJugador, mano, campos}],
       mazo
     });
+    escucharPartida(); // escucha en tiempo real
   } catch(e) {
     console.error(e);
   }
@@ -126,11 +139,36 @@ unirseBtn.addEventListener('click', async () => {
   mazo = partidaData.mazo;
   mano = repartirCartas(mazo,5);
   campos = [[],[],[]];
-  renderMano();
-  renderCampos();
+  codigoPartida = codigo;
 
-  await updateDoc(partidaRef, {
-    jugadores: arrayUnion({nombre: nombreJugador, mano, campos})
-  });
+  // Añadir jugador si no existe
+  if (!partidaData.jugadores.some(j => j.nombre === nombreJugador)) {
+    partidaData.jugadores.push({nombre: nombreJugador, mano, campos});
+    await updateDoc(partidaRef, { jugadores: partidaData.jugadores });
+  }
+
+  renderMano();
+  renderCampos(partidaData.jugadores);
   codigoContainer.textContent = `Te uniste a la partida ${codigo}`;
+
+  escucharPartida();
 });
+
+// Función para escuchar cambios en tiempo real
+function escucharPartida() {
+  if (!codigoPartida) return;
+  const partidaRef = doc(db, 'partidas', codigoPartida);
+  onSnapshot(partidaRef, (snap) => {
+    if (!snap.exists()) return;
+    const data = snap.data();
+    // Actualiza campos de todos
+    renderCampos(data.jugadores);
+    // Actualiza tu mano si ha cambiado (por ejemplo tras plantar)
+    const yo = data.jugadores.find(j => j.nombre === nombreJugador);
+    if (yo) {
+      mano = yo.mano;
+      campos = yo.campos;
+      renderMano();
+    }
+  });
+}
