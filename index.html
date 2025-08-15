@@ -6,22 +6,29 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <h1>Juego de Judías</h1>
 
-<h1>Juego de Judías</h1>
+  <!-- Guardar nombre -->
+  <label>Tu nombre: <input type="text" id="nombre" /></label>
+  <button id="guardarNombre">Guardar nombre</button>
+  <hr>
 
-<div>
-  <input type="text" id="nombre-jugador" placeholder="Nombre del jugador">
-  <button id="crear-partida">Crear partida</button>
-  <button id="unirse-partida">Unirse a la partida</button>
-</div>
+  <!-- Crear o unirse a partida -->
+  <button id="crearPartida">Crear partida</button>
+  <input type="text" id="codigoPartida" placeholder="Código para unirse">
+  <button id="unirsePartida">Unirse a partida</button>
 
-<div id="mano-container">
-  <h3>Tu mano</h3>
-  <div class="cartas-container" id="mano"></div>
-</div>
+  <h3>Jugadores en la partida:</h3>
+  <ul id="listaJugadores"></ul>
 
-<div id="contenedor-jugadores"></div>
+  <h3>Campos de cultivo:</h3>
+  <div id="camposContainer"></div>
 
-<script type="module" src="main.js"></script>
+  <h3>Cartas del jugador:</h3>
+  <div id="cartasJugador" class="cartas-container"></div>
+
+  <!-- Scripts -->
+  <script type="module" src="./mazo.js"></script>
+  <script type="module" src="./main.js"></script>
 </body>
 </html>
