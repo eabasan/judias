@@ -21,6 +21,7 @@ let mano = [];
 let campos = {}; 
 let mazo = [];
 let turnoActual = '';
+let faseActual = 0; // 0: Inicio, 1: Plantar, 2: Robar y Negociar, 3: Robar 3 y Finalizar
 
 // Elementos DOM
 const nombreInput = document.getElementById('nombre');
@@ -35,10 +36,11 @@ const listaJugadores = document.getElementById('listaJugadores');
 const mensajeTurno = document.getElementById('mensajeTurno');
 const partidaInfoDiv = document.getElementById('partidaInfo');
 const todosCamposContainer = document.getElementById('todosCamposContainer');
+const pasarTurnoBtn = document.getElementById('pasarTurnoBtn'); // Nuevo botón
+const faseInfo = document.getElementById('faseInfo'); // Nuevo elemento para la fase
 
 // --- Funciones del juego ---
 
-// Guardar nombre
 guardarNombreBtn.addEventListener('click', () => {
     const nombre = nombreInput.value.trim();
     if (!nombre) {
@@ -57,19 +59,18 @@ guardarNombreBtn.addEventListener('click', () => {
     }
 });
 
-// Generar código de partida
 function generarCodigo() {
     return Math.random().toString(36).substr(2, 5).toUpperCase();
 }
 
-// Renderizar la mano del jugador actual
 function renderMano() {
     manoContainer.innerHTML = '';
     mano.forEach((carta, i) => {
         const div = document.createElement('div');
         div.className = `carta ${carta.nombre.toLowerCase().replace(/\s/g, '-')}`;
         div.textContent = carta.nombre;
-        if (nombreJugador === turnoActual) {
+        // Solo puedes plantar en la Fase 1
+        if (nombreJugador === turnoActual && faseActual === 1) {
             div.addEventListener('click', () => plantarCarta(i));
         } else {
             div.style.opacity = 0.5;
@@ -79,7 +80,6 @@ function renderMano() {
     });
 }
 
-// Renderizar los campos de todos los jugadores
 function renderizarTodosLosCampos(jugadoresData) {
     todosCamposContainer.innerHTML = '';
     Object.keys(jugadoresData).forEach(nombre => {
@@ -112,7 +112,6 @@ function renderizarTodosLosCampos(jugadoresData) {
     });
 }
 
-// Actualizar el estado del jugador en Firebase
 async function actualizarEstadoJugador() {
     if (!codigoPartida || !nombreJugador) return;
 
@@ -123,10 +122,9 @@ async function actualizarEstadoJugador() {
     });
 }
 
-// Plantar carta
 async function plantarCarta(i) {
-    if (nombreJugador !== turnoActual) {
-        alert('No es tu turno para plantar.');
+    if (nombreJugador !== turnoActual || faseActual !== 1) {
+        alert('No es tu turno o no es la fase correcta para plantar.');
         return;
     }
 
@@ -149,7 +147,26 @@ async function plantarCarta(i) {
     }
 }
 
-// Iniciar el listener de la partida para todos los jugadores
+// Función para avanzar a la siguiente fase
+async function avanzarFase() {
+    if (nombreJugador !== turnoActual) {
+        alert('No es tu turno para avanzar la fase.');
+        return;
+    }
+    
+    let nuevaFase = faseActual + 1;
+    if (nuevaFase > 3) nuevaFase = 1; // Reiniciar o pasar al siguiente turno
+    
+    // Aquí iría la lógica para pasar de turno
+    // Por ahora, solo actualizamos la fase
+    await updateDoc(doc(db, 'partidas', codigoPartida), {
+        faseActual: nuevaFase
+    });
+
+    alert(`Avanzando a la Fase ${nuevaFase}`);
+}
+
+// Escuchar cambios en la partida
 function iniciarListenerPartida() {
     onSnapshot(doc(db, 'partidas', codigoPartida), snapshot => {
         if (snapshot.exists()) {
@@ -157,7 +174,24 @@ function iniciarListenerPartida() {
             
             mazo = partidaData.mazo || [];
             turnoActual = partidaData.turnoActual;
+            faseActual = partidaData.faseActual; // Actualizar la fase
+            
             mensajeTurno.textContent = `Turno de: ${turnoActual}`;
+            faseInfo.textContent = `Fase actual: ${faseActual}`; // Mostrar la fase
+            
+            // Lógica para habilitar/deshabilitar el botón de pasar de turno
+            if (nombreJugador === turnoActual) {
+                pasarTurnoBtn.style.display = 'block';
+                // La lógica para la negociación y robar cartas se implementaría aquí
+                if (faseActual === 2) {
+                    // Lógica para robar 2 cartas de comercio
+                }
+                if (faseActual === 3) {
+                    // Lógica para robar 3 cartas de la mano y pasar turno
+                }
+            } else {
+                pasarTurnoBtn.style.display = 'none';
+            }
 
             const miData = partidaData.jugadores[nombreJugador];
             if (miData) {
@@ -180,22 +214,16 @@ function iniciarListenerPartida() {
 
 // --- Event Listeners y Lógica Inicial ---
 
-// Crear partida
 crearBtn.addEventListener('click', async () => {
     if (!nombreJugador) {
         alert("Primero guarda tu nombre.");
         return;
     }
-
     codigoPartida = generarCodigo();
     const mazoCompleto = crearMazo();
     const { mano: manoInicial, mazoActualizado } = repartirCartas(mazoCompleto, 5);
     
-    const camposIniciales = {
-        campo1: [],
-        campo2: [],
-        campo3: []
-    };
+    const camposIniciales = { campo1: [], campo2: [], campo3: [] };
     
     try {
         await setDoc(doc(db, 'partidas', codigoPartida), {
@@ -203,30 +231,25 @@ crearBtn.addEventListener('click', async () => {
                 [nombreJugador]: { mano: manoInicial, campos: camposIniciales, oro: 0 }
             },
             mazo: mazoActualizado,
-            turnoActual: nombreJugador
+            turnoActual: nombreJugador,
+            faseActual: 1 // Iniciar en la fase 1
         });
         
         const enlacePartida = `${window.location.href.split('?')[0]}?codigo=${codigoPartida}`;
-        partidaInfoDiv.innerHTML = `
-            Código de partida: <strong>${codigoPartida}</strong><br>
-            Comparte este enlace: <a href="${enlacePartida}" target="_blank">${enlacePartida}</a>
-        `;
+        partidaInfoDiv.innerHTML = `Código de partida: <strong>${codigoPartida}</strong><br>Comparte este enlace: <a href="${enlacePartida}" target="_blank">${enlacePartida}</a>`;
         opcionesDiv.style.display = 'none';
         iniciarListenerPartida();
-
     } catch (error) {
         console.error("Error al crear la partida:", error);
         alert("Hubo un error al crear la partida. Inténtalo de nuevo.");
     }
 });
 
-// Unirse a partida
 async function unirseAPartida(codigo) {
     if (!nombreJugador) {
         alert("Primero guarda tu nombre.");
         return;
     }
-
     codigoPartida = codigo;
     const partidaRef = doc(db, 'partidas', codigo);
     const partidaSnapshot = await getDoc(partidaRef);
@@ -235,16 +258,11 @@ async function unirseAPartida(codigo) {
         alert('La partida no existe o el código es incorrecto.');
         return;
     }
-
     const partidaData = partidaSnapshot.data();
     let mazoRestante = partidaData.mazo;
     const { mano: nuevaMano, mazoActualizado } = repartirCartas(mazoRestante, 5);
     
-    const camposIniciales = {
-        campo1: [],
-        campo2: [],
-        campo3: []
-    };
+    const camposIniciales = { campo1: [], campo2: [], campo3: [] };
     
     try {
         await updateDoc(partidaRef, {
@@ -256,20 +274,15 @@ async function unirseAPartida(codigo) {
         });
 
         const enlacePartida = `${window.location.href.split('?')[0]}?codigo=${codigoPartida}`;
-        partidaInfoDiv.innerHTML = `
-            Código de partida: <strong>${codigoPartida}</strong><br>
-            Compartir enlace: <a href="${enlacePartida}" target="_blank">${enlacePartida}</a>
-        `;
+        partidaInfoDiv.innerHTML = `Código de partida: <strong>${codigoPartida}</strong><br>Compartir enlace: <a href="${enlacePartida}" target="_blank">${enlacePartida}</a>`;
         opcionesDiv.style.display = 'none';
         iniciarListenerPartida();
-
     } catch (error) {
         console.error("Error al unirse a la partida:", error);
         alert("Hubo un error al unirte a la partida. Inténtalo de nuevo.");
     }
 }
 
-// Evento para unirse a una partida con un código
 unirseBtn.addEventListener('click', () => {
     const codigo = codigoInput.value.trim();
     if (!codigo) {
@@ -279,7 +292,9 @@ unirseBtn.addEventListener('click', () => {
     unirseAPartida(codigo);
 });
 
-// Comprobar la URL al cargar la página para la unión automática
+// Botón para avanzar a la siguiente fase
+pasarTurnoBtn.addEventListener('click', avanzarFase);
+
 window.addEventListener('load', () => {
     const params = new URLSearchParams(window.location.search);
     const codigoDeURL = params.get('codigo');
