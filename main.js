@@ -18,7 +18,8 @@ const db = getFirestore(app);
 let nombreJugador = '';
 let codigoPartida = '';
 let mano = [];
-let campos = [[], [], []];
+// Variable campos ya no es un array anidado, sino un objeto
+let campos = {}; 
 let mazo = [];
 let turnoActual = '';
 
@@ -34,7 +35,7 @@ const manoContainer = document.getElementById('manoContainer');
 const camposContainer = document.getElementById('camposContainer');
 const listaJugadores = document.getElementById('listaJugadores');
 const mensajeTurno = document.getElementById('mensajeTurno');
-const partidaInfoDiv = document.getElementById('partidaInfo'); // Nuevo div para el código y el enlace
+const partidaInfoDiv = document.getElementById('partidaInfo');
 
 // Función para guardar el nombre del jugador
 guardarNombreBtn.addEventListener('click', () => {
@@ -48,7 +49,6 @@ guardarNombreBtn.addEventListener('click', () => {
     nombreInput.style.display = 'none';
     guardarNombreBtn.style.display = 'none';
     
-    // Si la URL ya tiene un código, unirse automáticamente
     const params = new URLSearchParams(window.location.search);
     const codigoDeURL = params.get('codigo');
     if (codigoDeURL) {
@@ -81,7 +81,9 @@ function renderMano() {
 // Render campos
 function renderCampos() {
     camposContainer.innerHTML = '';
-    campos.forEach((campo, i) => {
+    // Iterar sobre los campos del objeto
+    Object.keys(campos).forEach(campoKey => {
+        const campo = campos[campoKey];
         const div = document.createElement('div');
         div.className = 'campo';
         if (campo.length > 0) {
@@ -92,7 +94,7 @@ function renderCampos() {
                 div.appendChild(cartaDiv);
             });
         } else {
-            div.textContent = `Campo ${i + 1} vacío`;
+            div.textContent = `Campo vacío`;
             div.style.color = '#aaa';
             div.style.fontSize = '14px';
         }
@@ -120,9 +122,11 @@ async function plantarCarta(i) {
 
     const cartaAPlantar = mano[i];
     let planted = false;
-    for (let j = 0; j < campos.length; j++) {
-        if (campos[j].length === 0 || campos[j][0].nombre === cartaAPlantar.nombre) {
-            campos[j].push(cartaAPlantar);
+    for (let j = 1; j <= 3; j++) {
+        const campoKey = `campo${j}`;
+        // Comprobar si el campo está vacío o si la primera carta coincide
+        if (campos[campoKey].length === 0 || campos[campoKey][0].nombre === cartaAPlantar.nombre) {
+            campos[campoKey].push(cartaAPlantar);
             planted = true;
             break;
         }
@@ -149,7 +153,8 @@ function iniciarListenerPartida() {
             const miData = partidaData.jugadores[nombreJugador];
             if (miData) {
                 mano = miData.mano;
-                campos = miData.campos;
+                // Los campos ahora son un objeto
+                campos = miData.campos; 
                 renderMano();
                 renderCampos();
             }
@@ -175,25 +180,28 @@ crearBtn.addEventListener('click', async () => {
     const mazoCompleto = crearMazo();
     const { mano: manoInicial, mazoActualizado } = repartirCartas(mazoCompleto, 5);
     
-    // Esperar a que la operación de escritura en Firebase se complete
+    // Nueva estructura para los campos
+    const camposIniciales = {
+        campo1: [],
+        campo2: [],
+        campo3: []
+    };
+    
     try {
         await setDoc(doc(db, 'partidas', codigoPartida), {
             jugadores: {
-                [nombreJugador]: { mano: manoInicial, campos: [[], [], []], oro: 0 }
+                [nombreJugador]: { mano: manoInicial, campos: camposIniciales, oro: 0 }
             },
             mazo: mazoActualizado,
             turnoActual: nombreJugador
         });
         
-        // La escritura fue exitosa, ahora muestra el código y el enlace
         const enlacePartida = `${window.location.href.split('?')[0]}?codigo=${codigoPartida}`;
         partidaInfoDiv.innerHTML = `
             Código de partida: <strong>${codigoPartida}</strong><br>
             Comparte este enlace: <a href="${enlacePartida}" target="_blank">${enlacePartida}</a>
         `;
         opcionesDiv.style.display = 'none';
-
-        // Iniciar el listener
         iniciarListenerPartida();
 
     } catch (error) {
@@ -202,7 +210,7 @@ crearBtn.addEventListener('click', async () => {
     }
 });
 
-// Función para unirse a la partida (puede ser llamada por un evento o la URL)
+// Función para unirse a la partida
 async function unirseAPartida(codigo) {
     if (!nombreJugador) {
         alert("Primero guarda tu nombre.");
@@ -222,11 +230,18 @@ async function unirseAPartida(codigo) {
     let mazoRestante = partidaData.mazo;
     const { mano: nuevaMano, mazoActualizado } = repartirCartas(mazoRestante, 5);
     
+    // Nueva estructura para los campos al unirse
+    const camposIniciales = {
+        campo1: [],
+        campo2: [],
+        campo3: []
+    };
+    
     try {
         await updateDoc(partidaRef, {
             jugadores: {
                 ...partidaData.jugadores,
-                [nombreJugador]: { mano: nuevaMano, campos: [[], [], []], oro: 0 }
+                [nombreJugador]: { mano: nuevaMano, campos: camposIniciales, oro: 0 }
             },
             mazo: mazoActualizado
         });
@@ -237,8 +252,8 @@ async function unirseAPartida(codigo) {
             Compartir enlace: <a href="${enlacePartida}" target="_blank">${enlacePartida}</a>
         `;
         opcionesDiv.style.display = 'none';
-
         iniciarListenerPartida();
+
     } catch (error) {
         console.error("Error al unirse a la partida:", error);
         alert("Hubo un error al unirte a la partida. Inténtalo de nuevo.");
@@ -260,9 +275,8 @@ window.addEventListener('load', () => {
     const params = new URLSearchParams(window.location.search);
     const codigoDeURL = params.get('codigo');
     if (codigoDeURL) {
-        // Ocultar las opciones y el input de nombre si la URL tiene un código
         opcionesDiv.style.display = 'none';
-        nombreInput.style.display = 'block'; // Mostrar el input para que ingrese su nombre
+        nombreInput.style.display = 'block';
         guardarNombreBtn.style.display = 'block';
         alert("Se te ha invitado a una partida. Por favor, introduce tu nombre.");
     }
