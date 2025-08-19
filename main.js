@@ -23,14 +23,14 @@ let mazo = [];
 let turnoActual = '';
 let faseActual = 0; 
 let oro = 0;
-let cartasDeComercio = []; // Nuevo: para las cartas que se roban en la fase de comercio
+let cartasDeComercio = []; 
+let jugadoresEnPartida = []; // Nuevo: lista de jugadores para el menú de ofertas
 
 // Constante para la tabla de precios de las judías (simplificada)
 const PRECIOS = {
     "Judia Bill": [0, 0, 1, 2, 3], 
     "Judia Negra": [0, 0, 1, 2, 3],
     "Judia Marron": [0, 0, 1, 2, 3],
-    // Puedes añadir más judías aquí
 };
 
 // Elementos DOM
@@ -49,8 +49,9 @@ const todosCamposContainer = document.getElementById('todosCamposContainer');
 const pasarTurnoBtn = document.getElementById('pasarTurnoBtn');
 const faseInfo = document.getElementById('faseInfo');
 const oroInfo = document.getElementById('oroInfo');
-const mazoInfo = document.getElementById('mazoInfo'); // Nuevo
-const comercioContainer = document.getElementById('comercioContainer'); // Nuevo
+const mazoInfo = document.getElementById('mazoInfo'); 
+const comercioContainer = document.getElementById('comercioContainer');
+const ofertasRecibidasContainer = document.getElementById('ofertasRecibidasContainer'); // Nuevo
 
 // --- Funciones del juego ---
 
@@ -83,7 +84,6 @@ function renderMano() {
         div.className = `carta ${carta.nombre.toLowerCase().replace(/\s/g, '-')}`;
         div.textContent = carta.nombre;
 
-        // Modificación clave: solo la primera carta es plantable
         if (nombreJugador === turnoActual && faseActual === 1 && i === 0) {
             div.addEventListener('click', () => plantarCarta(i));
         } else {
@@ -122,20 +122,93 @@ function renderCampos() {
     });
 }
 
-// Nuevo: Renderizar las cartas de comercio
+// Renderizar las cartas de comercio
 function renderCartasDeComercio() {
     comercioContainer.innerHTML = '';
     if (cartasDeComercio.length > 0) {
-        cartasDeComercio.forEach(carta => {
+        cartasDeComercio.forEach((carta, i) => {
             const div = document.createElement('div');
             div.className = `carta ${carta.nombre.toLowerCase().replace(/\s/g, '-')}`;
-            div.textContent = carta.nombre;
+            div.innerHTML = `${carta.nombre}<br><button class="ofrecer-btn">Ofrecer</button>`;
+            
+            // Lógica para ofrecer solo si es el turno del jugador y está en la fase de comercio
+            if (nombreJugador === turnoActual && faseActual === 2) {
+                div.querySelector('.ofrecer-btn').addEventListener('click', () => {
+                    mostrarMenuOferta(i);
+                });
+            } else {
+                 div.querySelector('.ofrecer-btn').style.display = 'none';
+            }
             comercioContainer.appendChild(div);
         });
     } else {
         comercioContainer.textContent = 'No hay cartas para intercambiar.';
     }
 }
+
+// Nuevo: Menú para ofrecer una carta
+function mostrarMenuOferta(cartaIndex) {
+    let menuHTML = `<h4>Ofrecer carta a...</h4>`;
+    jugadoresEnPartida.forEach(jugador => {
+        if (jugador !== nombreJugador) {
+            menuHTML += `<button class="ofrecer-a-btn" data-jugador="${jugador}" data-carta-index="${cartaIndex}">${jugador}</button>`;
+        }
+    });
+    comercioContainer.innerHTML = menuHTML;
+    comercioContainer.querySelectorAll('.ofrecer-a-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const jugadorDestino = e.target.getAttribute('data-jugador');
+            const indexCarta = parseInt(e.target.getAttribute('data-carta-index'));
+            ofrecerCarta(indexCarta, jugadorDestino);
+        });
+    });
+}
+
+// Nuevo: Enviar una oferta a Firebase
+async function ofrecerCarta(indexCarta, jugadorDestino) {
+    const cartaOfrecida = cartasDeComercio[indexCarta];
+    const partidaRef = doc(db, 'partidas', codigoPartida);
+    
+    // Quitar la carta del área de comercio
+    const nuevasCartasDeComercio = [...cartasDeComercio];
+    nuevasCartasDeComercio.splice(indexCarta, 1);
+
+    await updateDoc(partidaRef, {
+        cartasDeComercio: nuevasCartasDeComercio,
+        propuestas: {
+            [jugadorDestino]: cartaOfrecida
+        }
+    });
+    renderCartasDeComercio();
+    alert(`Has ofrecido ${cartaOfrecida.nombre} a ${jugadorDestino}.`);
+}
+
+// Nuevo: Aceptar una oferta de Firebase
+async function aceptarOferta(carta) {
+    // Lógica para plantar la carta en un campo
+    let planted = false;
+    for (let j = 1; j <= 3; j++) {
+        const campoKey = `campo${j}`;
+        if (campos[campoKey].length === 0 || campos[campoKey][0].nombre === carta.nombre) {
+            campos[campoKey].push(carta);
+            planted = true;
+            break;
+        }
+    }
+    
+    if (planted) {
+        // Si se planta con éxito, actualizar el estado del jugador y borrar la propuesta
+        const partidaRef = doc(db, 'partidas', codigoPartida);
+        await updateDoc(partidaRef, {
+            [`jugadores.${nombreJugador}.campos`]: campos,
+            [`propuestas.${nombreJugador}`]: null // Eliminar la propuesta
+        });
+        alert(`Has aceptado y plantado la ${carta.nombre}.`);
+    } else {
+        alert('No puedes plantar esta judía. Necesitas un campo vacío o con el mismo tipo.');
+    }
+}
+
 
 function renderizarTodosLosCampos(jugadoresData) {
     todosCamposContainer.innerHTML = '';
@@ -169,148 +242,9 @@ function renderizarTodosLosCampos(jugadoresData) {
     });
 }
 
-async function actualizarEstadoJugador() {
-    if (!codigoPartida || !nombreJugador) return;
+// ... (El resto de las funciones como cosecharCampo, plantarCarta, avanzarFase y pasarTurno no han cambiado, por lo que no las repito aquí para ahorrar espacio, pero asumo que las pegarás por completo) ...
 
-    const partidaRef = doc(db, 'partidas', codigoPartida);
-    await updateDoc(partidaRef, {
-        [`jugadores.${nombreJugador}.mano`]: mano,
-        [`jugadores.${nombreJugador}.campos`]: campos
-    });
-}
-
-async function cosecharCampo(campoKey) {
-    if (!campos[campoKey] || campos[campoKey].length === 0) {
-        alert("Este campo está vacío, no se puede cosechar.");
-        return;
-    }
-
-    const tipoJudia = campos[campoKey][0].nombre;
-    const cantidad = campos[campoKey].length;
-    const precioTabla = PRECIOS[tipoJudia];
-
-    let monedasGanadas = 0;
-    if (precioTabla) {
-        monedasGanadas = precioTabla.findIndex(minCards => cantidad >= minCards) + 1;
-        if (monedasGanadas > 0) {
-            monedasGanadas--; 
-        } else {
-             monedasGanadas = 0;
-        }
-    } else {
-        alert("Tipo de judía no reconocido en la tabla de precios.");
-        return;
-    }
-    
-    if (monedasGanadas === 0) {
-        alert(`No hay suficientes judías para ganar oro en este campo.`);
-        campos[campoKey] = [];
-        await updateDoc(doc(db, 'partidas', codigoPartida), {
-            [`jugadores.${nombreJugador}.campos`]: campos
-        });
-        return;
-    }
-
-    const partidaRef = doc(db, 'partidas', codigoPartida);
-    const partidaSnapshot = await getDoc(partidaRef);
-    const jugadorData = partidaSnapshot.data().jugadores[nombreJugador];
-    const oroActual = jugadorData.oro || 0;
-    const nuevoOro = oroActual + monedasGanadas;
-    
-    campos[campoKey] = [];
-    
-    await updateDoc(partidaRef, {
-        [`jugadores.${nombreJugador}.oro`]: nuevoOro,
-        [`jugadores.${nombreJugador}.campos`]: campos
-    });
-    alert(`Has cosechado ${cantidad} judías de tipo "${tipoJudia}" y ganado ${monedasGanadas} de oro.`);
-}
-
-async function plantarCarta(i) {
-    if (nombreJugador !== turnoActual || faseActual !== 1) {
-        alert('No es tu turno o no es la fase correcta para plantar.');
-        return;
-    }
-
-    const cartaAPlantar = mano[i];
-    let planted = false;
-    for (let j = 1; j <= 3; j++) {
-        const campoKey = `campo${j}`;
-        if (campos[campoKey].length === 0 || campos[campoKey][0].nombre === cartaAPlantar.nombre) {
-            campos[campoKey].push(cartaAPlantar);
-            planted = true;
-            break;
-        }
-    }
-
-    if (planted) {
-        mano.splice(i, 1);
-        await actualizarEstadoJugador();
-    } else {
-        alert('No puedes plantar esta judía en ningún campo existente. Necesitas un campo vacío o uno con el mismo tipo de judía.');
-    }
-}
-
-// Nueva función para gestionar el paso de turno
-async function pasarTurno() {
-    const partidaRef = doc(db, 'partidas', codigoPartida);
-    await runTransaction(db, async (transaction) => {
-        const partidaDoc = await transaction.get(partidaRef);
-        const partidaData = partidaDoc.data();
-        const jugadores = Object.keys(partidaData.jugadores);
-        const currentIndex = jugadores.indexOf(nombreJugador);
-        const nextIndex = (currentIndex + 1) % jugadores.length;
-        const siguienteJugador = jugadores[nextIndex];
-        
-        // Transacción: actualiza el turno y la fase
-        transaction.update(partidaRef, {
-            turnoActual: siguienteJugador,
-            faseActual: 1, // El nuevo turno siempre empieza en la fase 1
-            cartasDeComercio: [], // Limpiar las cartas de comercio
-        });
-    });
-}
-
-// Lógica de fases
-async function avanzarFase() {
-    if (nombreJugador !== turnoActual) {
-        alert('No es tu turno para avanzar la fase.');
-        return;
-    }
-    
-    const partidaRef = doc(db, 'partidas', codigoPartida);
-    const partidaSnapshot = await getDoc(partidaRef);
-    const partidaData = partidaSnapshot.data();
-    let mazoActual = partidaData.mazo;
-    
-    let nuevaFase = faseActual + 1;
-    
-    if (nuevaFase === 2) {
-        // Fase 2: Robar 2 cartas para el área de comercio
-        const cartasRobadas = mazoActual.splice(0, 2);
-        await updateDoc(partidaRef, {
-            faseActual: nuevaFase,
-            cartasDeComercio: cartasRobadas,
-            mazo: mazoActual
-        });
-        alert('Has entrado en la fase de comercio. Tienes 2 cartas para negociar.');
-        
-    } else if (nuevaFase === 3) {
-        // Fase 3: Robar 3 cartas y añadir a la mano
-        const nuevasCartas = mazoActual.splice(0, 3);
-        const miMano = [...mano, ...nuevasCartas];
-        await updateDoc(partidaRef, {
-            faseActual: nuevaFase,
-            mazo: mazoActual,
-            [`jugadores.${nombreJugador}.mano`]: miMano,
-        });
-        alert('Has robado 3 cartas. Tu turno va a terminar.');
-    } else {
-        // Al final del turno (después de la fase 3), pasar al siguiente jugador
-        await pasarTurno();
-    }
-}
-
+// ** IMPORTANTE: Se añade la lógica de ofertas a onSnapshot **
 function iniciarListenerPartida() {
     onSnapshot(doc(db, 'partidas', codigoPartida), snapshot => {
         if (snapshot.exists()) {
@@ -319,11 +253,12 @@ function iniciarListenerPartida() {
             mazo = partidaData.mazo || [];
             turnoActual = partidaData.turnoActual;
             faseActual = partidaData.faseActual; 
-            cartasDeComercio = partidaData.cartasDeComercio || []; // Actualizar las cartas de comercio
-            
+            cartasDeComercio = partidaData.cartasDeComercio || []; 
+            jugadoresEnPartida = Object.keys(partidaData.jugadores); // Actualizar la lista de jugadores
+
             mensajeTurno.textContent = `Turno de: ${turnoActual}`;
             faseInfo.textContent = `Fase actual: ${faseActual}`; 
-            mazoInfo.textContent = `Cartas en el mazo: ${mazo.length}`; // Mostrar el mazo
+            mazoInfo.textContent = `Cartas en el mazo: ${mazo.length}`; 
             
             if (nombreJugador === turnoActual) {
                 pasarTurnoBtn.style.display = 'block';
@@ -342,10 +277,25 @@ function iniciarListenerPartida() {
             }
             
             renderizarTodosLosCampos(partidaData.jugadores);
-            renderCartasDeComercio(); // Renderizar las cartas de comercio
+            renderCartasDeComercio();
+            
+            // Lógica para mostrar las ofertas recibidas
+            ofertasRecibidasContainer.innerHTML = '';
+            const miPropuesta = partidaData.propuestas?.[nombreJugador];
+            if (miPropuesta) {
+                const ofertaDiv = document.createElement('div');
+                ofertaDiv.innerHTML = `
+                    <p>Has recibido una oferta de ${turnoActual}: ${miPropuesta.nombre}</p>
+                    <button id="aceptarOfertaBtn">Aceptar</button>
+                `;
+                ofertasRecibidasContainer.appendChild(ofertaDiv);
+                document.getElementById('aceptarOfertaBtn').addEventListener('click', () => {
+                    aceptarOferta(miPropuesta);
+                });
+            }
 
             listaJugadores.innerHTML = '';
-            Object.keys(partidaData.jugadores).forEach(jug => {
+            jugadoresEnPartida.forEach(jug => {
                 const li = document.createElement('li');
                 li.textContent = jug;
                 listaJugadores.appendChild(li);
@@ -354,19 +304,11 @@ function iniciarListenerPartida() {
     });
 }
 
+
 // --- Event Listeners y Lógica Inicial ---
 
 crearBtn.addEventListener('click', async () => {
-    if (!nombreJugador) {
-        alert("Primero guarda tu nombre.");
-        return;
-    }
-    codigoPartida = generarCodigo();
-    const mazoCompleto = crearMazo();
-    const { mano: manoInicial, mazoActualizado } = repartirCartas(mazoCompleto, 5);
-    
-    const camposIniciales = { campo1: [], campo2: [], campo3: [] }; 
-    
+    // ... (el código de esta función es igual al anterior, solo cambia la parte de 'propuestas' para inicializarlo) ...
     try {
         await setDoc(doc(db, 'partidas', codigoPartida), {
             jugadores: {
@@ -374,56 +316,19 @@ crearBtn.addEventListener('click', async () => {
             },
             mazo: mazoActualizado,
             turnoActual: nombreJugador,
-            faseActual: 1, // Iniciar en la fase 1
-            cartasDeComercio: []
+            faseActual: 1, 
+            cartasDeComercio: [],
+            propuestas: {} // Nuevo: Inicializar un objeto para las propuestas
         });
         
-        const enlacePartida = `${window.location.href.split('?')[0]}?codigo=${codigoPartida}`;
-        partidaInfoDiv.innerHTML = `Código de partida: <strong>${codigoPartida}</strong><br>Comparte este enlace: <a href="${enlacePartida}" target="_blank">${enlacePartida}</a>`;
-        opcionesDiv.style.display = 'none';
-        iniciarListenerPartida();
+        // ... (resto del código)
     } catch (error) {
-        console.error("Error al crear la partida:", error);
-        alert("Hubo un error al crear la partida. Inténtalo de nuevo.");
+        // ... (código de error)
     }
 });
 
 async function unirseAPartida(codigo) {
-    if (!nombreJugador) {
-        alert("Primero guarda tu nombre.");
-        return;
-    }
-    codigoPartida = codigo;
-    const partidaRef = doc(db, 'partidas', codigo);
-    const partidaSnapshot = await getDoc(partidaRef);
-
-    if (!partidaSnapshot.exists()) {
-        alert('La partida no existe o el código es incorrecto.');
-        return;
-    }
-    const partidaData = partidaSnapshot.data();
-    let mazoRestante = partidaData.mazo;
-    const { mano: nuevaMano, mazoActualizado } = repartirCartas(mazoRestante, 5);
-    
-    const camposIniciales = { campo1: [], campo2: [], campo3: [] }; 
-    
-    try {
-        await updateDoc(partidaRef, {
-            jugadores: {
-                ...partidaData.jugadores,
-                [nombreJugador]: { mano: nuevaMano, campos: camposIniciales, oro: 0 }
-            },
-            mazo: mazoActualizado
-        });
-
-        const enlacePartida = `${window.location.href.split('?')[0]}?codigo=${codigoPartida}`;
-        partidaInfoDiv.innerHTML = `Código de partida: <strong>${codigoPartida}</strong><br>Compartir enlace: <a href="${enlacePartida}" target="_blank">${enlacePartida}</a>`;
-        opcionesDiv.style.display = 'none';
-        iniciarListenerPartida();
-    } catch (error) {
-        console.error("Error al unirse a la partida:", error);
-        alert("Hubo un error al unirte a la partida. Inténtalo de nuevo.");
-    }
+    // ... (el código de esta función es igual al anterior) ...
 }
 
 unirseBtn.addEventListener('click', () => {
