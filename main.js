@@ -4,7 +4,7 @@ import { getFirestore, doc, setDoc, updateDoc, onSnapshot, getDoc } from "https:
 
 // Config Firebase (¡Asegúrate de que esta configuración es correcta para tu proyecto!)
 const firebaseConfig = {
-    apiKey: "AIzaSyCA_tuTWdV8GJuzBbRgzOIyPszHR-kgpe4", // ¡Revisa tu API Key!
+    apiKey: "AIzaSyCA_tuTWdV8GJuzBbRgzOIyPszHR-kgpe4",
     authDomain: "judias.firebaseapp.com",
     projectId: "judias",
     storageBucket: "judias.appspot.com",
@@ -19,8 +19,8 @@ let nombreJugador = '';
 let codigoPartida = '';
 let mano = [];
 let campos = [[], [], []];
-let mazo = []; // Mazo de la partida, se gestiona en Firebase
-let turnoActual = ''; // Nombre del jugador al que le toca el turno
+let mazo = [];
+let turnoActual = '';
 
 // Elementos DOM
 const nombreInput = document.getElementById('nombre');
@@ -33,7 +33,7 @@ const codigoContainer = document.getElementById('codigoPartidaContainer');
 const manoContainer = document.getElementById('manoContainer');
 const camposContainer = document.getElementById('camposContainer');
 const listaJugadores = document.getElementById('listaJugadores');
-const mensajeTurno = document.getElementById('mensajeTurno'); // Nuevo elemento para el turno
+const mensajeTurno = document.getElementById('mensajeTurno');
 
 // Guardar nombre
 guardarNombreBtn.addEventListener('click', () => {
@@ -45,8 +45,8 @@ guardarNombreBtn.addEventListener('click', () => {
     nombreJugador = nombre;
     alert("Nombre guardado: " + nombreJugador);
     opcionesDiv.style.display = 'block';
-    nombreInput.style.display = 'none'; // Ocultar input de nombre
-    guardarNombreBtn.style.display = 'none'; // Ocultar botón de guardar nombre
+    nombreInput.style.display = 'none';
+    guardarNombreBtn.style.display = 'none';
 });
 
 // Generar código
@@ -61,11 +61,10 @@ function renderMano() {
         const div = document.createElement('div');
         div.className = `carta ${carta.nombre.toLowerCase().replace(/\s/g, '-')}`;
         div.textContent = carta.nombre;
-        // Solo permitir plantar si es tu turno
         if (nombreJugador === turnoActual) {
             div.addEventListener('click', () => plantarCarta(i));
         } else {
-            div.style.opacity = 0.5; // Visualmente indicar que no es su turno
+            div.style.opacity = 0.5;
             div.style.cursor = 'not-allowed';
         }
         manoContainer.appendChild(div);
@@ -102,7 +101,6 @@ async function actualizarEstadoJugador() {
     await updateDoc(partidaRef, {
         [`jugadores.${nombreJugador}.mano`]: mano,
         [`jugadores.${nombreJugador}.campos`]: campos
-        // Otros estados del jugador como el oro se actualizarían aquí
     });
 }
 
@@ -125,8 +123,7 @@ async function plantarCarta(i) {
 
     if (planted) {
         mano.splice(i, 1);
-        await actualizarEstadoJugador(); // Guardar el cambio en Firebase
-        // Podrías pasar el turno aquí o en una fase posterior del juego
+        await actualizarEstadoJugador();
     } else {
         alert('No puedes plantar esta judía en ningún campo existente. Necesitas un campo vacío o uno con el mismo tipo de judía.');
     }
@@ -134,33 +131,37 @@ async function plantarCarta(i) {
 
 // Crear partida
 crearBtn.addEventListener('click', async () => {
-    codigoPartida = generarCodigo();
-    mazo = crearMazo(); // El mazo inicial se crea aquí
-    mano = repartirCartas(mazo, 5); // Repartir mano inicial al creador
+    // Verificar si el nombre del jugador está guardado antes de continuar
+    if (!nombreJugador) {
+        alert("Primero guarda tu nombre.");
+        return;
+    }
 
-    // Establecer el estado inicial de la partida en Firebase
+    codigoPartida = generarCodigo();
+    mazo = crearMazo();
+    const { mano: manoInicial, mazoActualizado } = repartirCartas(mazo, 5);
+    mano = manoInicial;
+    mazo = mazoActualizado;
+
     await setDoc(doc(db, 'partidas', codigoPartida), {
         jugadores: {
-            [nombreJugador]: { mano, campos: [[], [], []], oro: 0 } // Estado del creador
+            [nombreJugador]: { mano, campos: [[], [], []], oro: 0 }
         },
-        mazo: mazo, // Guardar el mazo completo
-        turnoActual: nombreJugador // El creador empieza el turno
+        mazo: mazo,
+        turnoActual: nombreJugador
     });
 
     codigoContainer.textContent = `Código de partida: ${codigoPartida}`;
-    opcionesDiv.style.display = 'none'; // Ocultar opciones al crear/unirse
+    opcionesDiv.style.display = 'none';
 
-    // Escuchar la partida en tiempo real
     onSnapshot(doc(db, 'partidas', codigoPartida), snapshot => {
         if (snapshot.exists()) {
             const partidaData = snapshot.data();
             
-            // Actualizar el estado global del mazo y turno
-            mazo = partidaData.mazo || []; // Asegurarse de que el mazo exista
+            mazo = partidaData.mazo || [];
             turnoActual = partidaData.turnoActual;
             mensajeTurno.textContent = `Turno de: ${turnoActual}`;
 
-            // Actualizar la mano y campos locales del jugador actual con los datos de Firebase
             const miData = partidaData.jugadores[nombreJugador];
             if (miData) {
                 mano = miData.mano;
@@ -169,9 +170,7 @@ crearBtn.addEventListener('click', async () => {
                 renderCampos();
             }
 
-            // Actualizar la lista de jugadores
             listaJugadores.innerHTML = '';
-            // Object.keys(partidaData.jugadores) devolverá un array con los nombres de los jugadores
             Object.keys(partidaData.jugadores).forEach(jug => {
                 const li = document.createElement('li');
                 li.textContent = jug;
@@ -183,6 +182,12 @@ crearBtn.addEventListener('click', async () => {
 
 // Unirse a partida
 unirseBtn.addEventListener('click', async () => {
+    // Verificar si el nombre del jugador está guardado antes de continuar
+    if (!nombreJugador) {
+        alert("Primero guarda tu nombre.");
+        return;
+    }
+
     const codigo = codigoInput.value.trim();
     if (!codigo) {
         alert('Introduce el código de la partida.');
@@ -201,34 +206,29 @@ unirseBtn.addEventListener('click', async () => {
     const partidaData = partidaSnapshot.data();
     let mazoRestante = partidaData.mazo;
 
-    // Repartir 5 cartas del mazo a este nuevo jugador
     const { mano: nuevaMano, mazoActualizado } = repartirCartas(mazoRestante, 5);
     mano = nuevaMano;
     mazoRestante = mazoActualizado;
 
-    // Actualizar el documento de la partida con el nuevo jugador y el mazo actualizado
     await updateDoc(partidaRef, {
         jugadores: {
-            ...partidaData.jugadores, // Mantener los jugadores existentes
-            [nombreJugador]: { mano, campos: [[], [], []], oro: 0 } // Añadir al nuevo jugador
+            ...partidaData.jugadores,
+            [nombreJugador]: { mano, campos: [[], [], []], oro: 0 }
         },
-        mazo: mazoRestante // Actualizar el mazo global de la partida
+        mazo: mazoRestante
     });
 
     codigoContainer.textContent = `Código de partida: ${codigoPartida}`;
-    opcionesDiv.style.display = 'none'; // Ocultar opciones al crear/unirse
+    opcionesDiv.style.display = 'none';
 
-    // Escuchar cambios en tiempo real
     onSnapshot(partidaRef, snapshot => {
         if (snapshot.exists()) {
             const partidaData = snapshot.data();
 
-            // Actualizar el estado global del mazo y turno
             mazo = partidaData.mazo || [];
             turnoActual = partidaData.turnoActual;
             mensajeTurno.textContent = `Turno de: ${turnoActual}`;
 
-            // Actualizar la mano y campos locales del jugador actual
             const miData = partidaData.jugadores[nombreJugador];
             if (miData) {
                 mano = miData.mano;
@@ -237,7 +237,6 @@ unirseBtn.addEventListener('click', async () => {
                 renderCampos();
             }
 
-            // Actualizar la lista de jugadores
             listaJugadores.innerHTML = '';
             Object.keys(partidaData.jugadores).forEach(jug => {
                 const li = document.createElement('li');
