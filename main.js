@@ -2,7 +2,7 @@ import { crearMazo, repartirCartas } from './mazo.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 import { getFirestore, doc, setDoc, updateDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
-// Config Firebase (¡Asegúrate de que esta configuración es correcta para tu proyecto!)
+// Config Firebase
 const firebaseConfig = {
     apiKey: "AIzaSyCA_tuTWdV8GJuzBbRgzOIyPszHR-kgpe4",
     authDomain: "judias.firebaseapp.com",
@@ -34,8 +34,9 @@ const manoContainer = document.getElementById('manoContainer');
 const camposContainer = document.getElementById('camposContainer');
 const listaJugadores = document.getElementById('listaJugadores');
 const mensajeTurno = document.getElementById('mensajeTurno');
+const partidaInfoDiv = document.getElementById('partidaInfo'); // Nuevo div para el código y el enlace
 
-// Guardar nombre
+// Función para guardar el nombre del jugador
 guardarNombreBtn.addEventListener('click', () => {
     const nombre = nombreInput.value.trim();
     if (!nombre) {
@@ -43,10 +44,16 @@ guardarNombreBtn.addEventListener('click', () => {
         return;
     }
     nombreJugador = nombre;
-    alert("Nombre guardado: " + nombreJugador);
     opcionesDiv.style.display = 'block';
     nombreInput.style.display = 'none';
     guardarNombreBtn.style.display = 'none';
+    
+    // Si la URL ya tiene un código, unirse automáticamente
+    const params = new URLSearchParams(window.location.search);
+    const codigoDeURL = params.get('codigo');
+    if (codigoDeURL) {
+        unirseAPartida(codigoDeURL);
+    }
 });
 
 // Generar código
@@ -129,31 +136,8 @@ async function plantarCarta(i) {
     }
 }
 
-// Crear partida
-crearBtn.addEventListener('click', async () => {
-    // Verificar si el nombre del jugador está guardado antes de continuar
-    if (!nombreJugador) {
-        alert("Primero guarda tu nombre.");
-        return;
-    }
-
-    codigoPartida = generarCodigo();
-    mazo = crearMazo();
-    const { mano: manoInicial, mazoActualizado } = repartirCartas(mazo, 5);
-    mano = manoInicial;
-    mazo = mazoActualizado;
-
-    await setDoc(doc(db, 'partidas', codigoPartida), {
-        jugadores: {
-            [nombreJugador]: { mano, campos: [[], [], []], oro: 0 }
-        },
-        mazo: mazo,
-        turnoActual: nombreJugador
-    });
-
-    codigoContainer.textContent = `Código de partida: ${codigoPartida}`;
-    opcionesDiv.style.display = 'none';
-
+// Iniciar el listener de la partida para todos los jugadores
+function iniciarListenerPartida() {
     onSnapshot(doc(db, 'partidas', codigoPartida), snapshot => {
         if (snapshot.exists()) {
             const partidaData = snapshot.data();
@@ -178,23 +162,54 @@ crearBtn.addEventListener('click', async () => {
             });
         }
     });
-});
+}
 
-// Unirse a partida
-unirseBtn.addEventListener('click', async () => {
-    // Verificar si el nombre del jugador está guardado antes de continuar
+// Función para crear la partida
+crearBtn.addEventListener('click', async () => {
     if (!nombreJugador) {
         alert("Primero guarda tu nombre.");
         return;
     }
 
-    const codigo = codigoInput.value.trim();
-    if (!codigo) {
-        alert('Introduce el código de la partida.');
+    codigoPartida = generarCodigo();
+    const mazoCompleto = crearMazo();
+    const { mano: manoInicial, mazoActualizado } = repartirCartas(mazoCompleto, 5);
+    
+    // Esperar a que la operación de escritura en Firebase se complete
+    try {
+        await setDoc(doc(db, 'partidas', codigoPartida), {
+            jugadores: {
+                [nombreJugador]: { mano: manoInicial, campos: [[], [], []], oro: 0 }
+            },
+            mazo: mazoActualizado,
+            turnoActual: nombreJugador
+        });
+        
+        // La escritura fue exitosa, ahora muestra el código y el enlace
+        const enlacePartida = `${window.location.href.split('?')[0]}?codigo=${codigoPartida}`;
+        partidaInfoDiv.innerHTML = `
+            Código de partida: <strong>${codigoPartida}</strong><br>
+            Comparte este enlace: <a href="${enlacePartida}" target="_blank">${enlacePartida}</a>
+        `;
+        opcionesDiv.style.display = 'none';
+
+        // Iniciar el listener
+        iniciarListenerPartida();
+
+    } catch (error) {
+        console.error("Error al crear la partida:", error);
+        alert("Hubo un error al crear la partida. Inténtalo de nuevo.");
+    }
+});
+
+// Función para unirse a la partida (puede ser llamada por un evento o la URL)
+async function unirseAPartida(codigo) {
+    if (!nombreJugador) {
+        alert("Primero guarda tu nombre.");
         return;
     }
-    codigoPartida = codigo;
 
+    codigoPartida = codigo;
     const partidaRef = doc(db, 'partidas', codigo);
     const partidaSnapshot = await getDoc(partidaRef);
 
@@ -205,44 +220,50 @@ unirseBtn.addEventListener('click', async () => {
 
     const partidaData = partidaSnapshot.data();
     let mazoRestante = partidaData.mazo;
-
     const { mano: nuevaMano, mazoActualizado } = repartirCartas(mazoRestante, 5);
-    mano = nuevaMano;
-    mazoRestante = mazoActualizado;
+    
+    try {
+        await updateDoc(partidaRef, {
+            jugadores: {
+                ...partidaData.jugadores,
+                [nombreJugador]: { mano: nuevaMano, campos: [[], [], []], oro: 0 }
+            },
+            mazo: mazoActualizado
+        });
 
-    await updateDoc(partidaRef, {
-        jugadores: {
-            ...partidaData.jugadores,
-            [nombreJugador]: { mano, campos: [[], [], []], oro: 0 }
-        },
-        mazo: mazoRestante
-    });
+        const enlacePartida = `${window.location.href.split('?')[0]}?codigo=${codigoPartida}`;
+        partidaInfoDiv.innerHTML = `
+            Código de partida: <strong>${codigoPartida}</strong><br>
+            Compartir enlace: <a href="${enlacePartida}" target="_blank">${enlacePartida}</a>
+        `;
+        opcionesDiv.style.display = 'none';
 
-    codigoContainer.textContent = `Código de partida: ${codigoPartida}`;
-    opcionesDiv.style.display = 'none';
+        iniciarListenerPartida();
+    } catch (error) {
+        console.error("Error al unirse a la partida:", error);
+        alert("Hubo un error al unirte a la partida. Inténtalo de nuevo.");
+    }
+}
 
-    onSnapshot(partidaRef, snapshot => {
-        if (snapshot.exists()) {
-            const partidaData = snapshot.data();
+// Evento para unirse a una partida con un código
+unirseBtn.addEventListener('click', () => {
+    const codigo = codigoInput.value.trim();
+    if (!codigo) {
+        alert('Introduce el código de la partida.');
+        return;
+    }
+    unirseAPartida(codigo);
+});
 
-            mazo = partidaData.mazo || [];
-            turnoActual = partidaData.turnoActual;
-            mensajeTurno.textContent = `Turno de: ${turnoActual}`;
-
-            const miData = partidaData.jugadores[nombreJugador];
-            if (miData) {
-                mano = miData.mano;
-                campos = miData.campos;
-                renderMano();
-                renderCampos();
-            }
-
-            listaJugadores.innerHTML = '';
-            Object.keys(partidaData.jugadores).forEach(jug => {
-                const li = document.createElement('li');
-                li.textContent = jug;
-                listaJugadores.appendChild(li);
-            });
-        }
-    });
+// Comprobar la URL al cargar la página para la unión automática
+window.addEventListener('load', () => {
+    const params = new URLSearchParams(window.location.search);
+    const codigoDeURL = params.get('codigo');
+    if (codigoDeURL) {
+        // Ocultar las opciones y el input de nombre si la URL tiene un código
+        opcionesDiv.style.display = 'none';
+        nombreInput.style.display = 'block'; // Mostrar el input para que ingrese su nombre
+        guardarNombreBtn.style.display = 'block';
+        alert("Se te ha invitado a una partida. Por favor, introduce tu nombre.");
+    }
 });
