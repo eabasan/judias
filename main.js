@@ -1,6 +1,6 @@
 import { crearMazo, repartirCartas } from './mazo.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import { getFirestore, doc, setDoc, updateDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, updateDoc, onSnapshot, getDoc, runTransaction } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
 // Config Firebase
 const firebaseConfig = {
@@ -23,6 +23,7 @@ let mazo = [];
 let turnoActual = '';
 let faseActual = 0; 
 let oro = 0;
+let cartasDeComercio = []; // Nuevo: para las cartas que se roban en la fase de comercio
 
 // Constante para la tabla de precios de las judías (simplificada)
 const PRECIOS = {
@@ -48,6 +49,8 @@ const todosCamposContainer = document.getElementById('todosCamposContainer');
 const pasarTurnoBtn = document.getElementById('pasarTurnoBtn');
 const faseInfo = document.getElementById('faseInfo');
 const oroInfo = document.getElementById('oroInfo');
+const mazoInfo = document.getElementById('mazoInfo'); // Nuevo
+const comercioContainer = document.getElementById('comercioContainer'); // Nuevo
 
 // --- Funciones del juego ---
 
@@ -119,6 +122,20 @@ function renderCampos() {
     });
 }
 
+// Nuevo: Renderizar las cartas de comercio
+function renderCartasDeComercio() {
+    comercioContainer.innerHTML = '';
+    if (cartasDeComercio.length > 0) {
+        cartasDeComercio.forEach(carta => {
+            const div = document.createElement('div');
+            div.className = `carta ${carta.nombre.toLowerCase().replace(/\s/g, '-')}`;
+            div.textContent = carta.nombre;
+            comercioContainer.appendChild(div);
+        });
+    } else {
+        comercioContainer.textContent = 'No hay cartas para intercambiar.';
+    }
+}
 
 function renderizarTodosLosCampos(jugadoresData) {
     todosCamposContainer.innerHTML = '';
@@ -210,7 +227,6 @@ async function cosecharCampo(campoKey) {
 }
 
 async function plantarCarta(i) {
-    // La comprobación i === 0 ya la tenemos en renderMano
     if (nombreJugador !== turnoActual || faseActual !== 1) {
         alert('No es tu turno o no es la fase correcta para plantar.');
         return;
@@ -235,20 +251,64 @@ async function plantarCarta(i) {
     }
 }
 
+// Nueva función para gestionar el paso de turno
+async function pasarTurno() {
+    const partidaRef = doc(db, 'partidas', codigoPartida);
+    await runTransaction(db, async (transaction) => {
+        const partidaDoc = await transaction.get(partidaRef);
+        const partidaData = partidaDoc.data();
+        const jugadores = Object.keys(partidaData.jugadores);
+        const currentIndex = jugadores.indexOf(nombreJugador);
+        const nextIndex = (currentIndex + 1) % jugadores.length;
+        const siguienteJugador = jugadores[nextIndex];
+        
+        // Transacción: actualiza el turno y la fase
+        transaction.update(partidaRef, {
+            turnoActual: siguienteJugador,
+            faseActual: 1, // El nuevo turno siempre empieza en la fase 1
+            cartasDeComercio: [], // Limpiar las cartas de comercio
+        });
+    });
+}
+
+// Lógica de fases
 async function avanzarFase() {
     if (nombreJugador !== turnoActual) {
         alert('No es tu turno para avanzar la fase.');
         return;
     }
     
-    let nuevaFase = faseActual + 1;
-    if (nuevaFase > 3) nuevaFase = 1; 
+    const partidaRef = doc(db, 'partidas', codigoPartida);
+    const partidaSnapshot = await getDoc(partidaRef);
+    const partidaData = partidaSnapshot.data();
+    let mazoActual = partidaData.mazo;
     
-    await updateDoc(doc(db, 'partidas', codigoPartida), {
-        faseActual: nuevaFase
-    });
-
-    alert(`Avanzando a la Fase ${nuevaFase}`);
+    let nuevaFase = faseActual + 1;
+    
+    if (nuevaFase === 2) {
+        // Fase 2: Robar 2 cartas para el área de comercio
+        const cartasRobadas = mazoActual.splice(0, 2);
+        await updateDoc(partidaRef, {
+            faseActual: nuevaFase,
+            cartasDeComercio: cartasRobadas,
+            mazo: mazoActual
+        });
+        alert('Has entrado en la fase de comercio. Tienes 2 cartas para negociar.');
+        
+    } else if (nuevaFase === 3) {
+        // Fase 3: Robar 3 cartas y añadir a la mano
+        const nuevasCartas = mazoActual.splice(0, 3);
+        const miMano = [...mano, ...nuevasCartas];
+        await updateDoc(partidaRef, {
+            faseActual: nuevaFase,
+            mazo: mazoActual,
+            [`jugadores.${nombreJugador}.mano`]: miMano,
+        });
+        alert('Has robado 3 cartas. Tu turno va a terminar.');
+    } else {
+        // Al final del turno (después de la fase 3), pasar al siguiente jugador
+        await pasarTurno();
+    }
 }
 
 function iniciarListenerPartida() {
@@ -259,9 +319,11 @@ function iniciarListenerPartida() {
             mazo = partidaData.mazo || [];
             turnoActual = partidaData.turnoActual;
             faseActual = partidaData.faseActual; 
+            cartasDeComercio = partidaData.cartasDeComercio || []; // Actualizar las cartas de comercio
             
             mensajeTurno.textContent = `Turno de: ${turnoActual}`;
             faseInfo.textContent = `Fase actual: ${faseActual}`; 
+            mazoInfo.textContent = `Cartas en el mazo: ${mazo.length}`; // Mostrar el mazo
             
             if (nombreJugador === turnoActual) {
                 pasarTurnoBtn.style.display = 'block';
@@ -280,6 +342,7 @@ function iniciarListenerPartida() {
             }
             
             renderizarTodosLosCampos(partidaData.jugadores);
+            renderCartasDeComercio(); // Renderizar las cartas de comercio
 
             listaJugadores.innerHTML = '';
             Object.keys(partidaData.jugadores).forEach(jug => {
@@ -311,7 +374,8 @@ crearBtn.addEventListener('click', async () => {
             },
             mazo: mazoActualizado,
             turnoActual: nombreJugador,
-            faseActual: 1 
+            faseActual: 1, // Iniciar en la fase 1
+            cartasDeComercio: []
         });
         
         const enlacePartida = `${window.location.href.split('?')[0]}?codigo=${codigoPartida}`;
