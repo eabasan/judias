@@ -1,33 +1,32 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Juego de Judías</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <title>Juego de Judías</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Bienvenido al juego de Judías</h1>
+    <h1>Bienvenido al juego de Judías</h1>
 
-  <input type="text" id="nombre" placeholder="Tu nombre">
-  <button id="guardarNombre">Guardar nombre</button>
+    <input type="text" id="nombre" placeholder="Tu nombre">
+    <button id="guardarNombre">Guardar nombre</button>
 
-  <div id="opciones" style="display:none;">
-    <button id="crearPartida">Crear partida</button>
-    <button id="unirsePartida">Unirse a partida</button>
-    <input type="text" id="codigo" placeholder="Código de la partida">
-  </div>
+    <div id="opciones" style="display:none;">
+        <button id="crearPartida">Crear partida</button>
+        <button id="unirsePartida">Unirse a partida</button>
+        <input type="text" id="codigo" placeholder="Código de la partida">
+    </div>
 
-  <div id="codigoPartidaContainer"></div>
+    <div id="codigoPartidaContainer"></div>
+    <p id="mensajeTurno"></p> <h3>Mano:</h3>
+    <div id="manoContainer" class="cartas-container"></div>
 
-  <h3>Mano:</h3>
-  <div id="manoContainer"></div>
+    <h3>Campos:</h3>
+    <div id="camposContainer" class="campos"></div>
 
-  <h3>Campos:</h3>
-  <div id="camposContainer"></div>
+    <h3>Jugadores en la partida:</h3>
+    <ul id="listaJugadores"></ul>
 
-  <h3>Jugadores en la partida:</h3>
-  <ul id="listaJugadores"></ul>
-
-  <script type="module" src="./main.js"></script>
+    <script type="module" src="./main.js"></script>
 </body>
 </html>
