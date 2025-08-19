@@ -18,7 +18,6 @@ const db = getFirestore(app);
 let nombreJugador = '';
 let codigoPartida = '';
 let mano = [];
-// Variable campos ya no es un array anidado, sino un objeto
 let campos = {}; 
 let mazo = [];
 let turnoActual = '';
@@ -30,14 +29,16 @@ const opcionesDiv = document.getElementById('opciones');
 const crearBtn = document.getElementById('crearPartida');
 const unirseBtn = document.getElementById('unirsePartida');
 const codigoInput = document.getElementById('codigo');
-const codigoContainer = document.getElementById('codigoPartidaContainer');
 const manoContainer = document.getElementById('manoContainer');
 const camposContainer = document.getElementById('camposContainer');
 const listaJugadores = document.getElementById('listaJugadores');
 const mensajeTurno = document.getElementById('mensajeTurno');
 const partidaInfoDiv = document.getElementById('partidaInfo');
+const todosCamposContainer = document.getElementById('todosCamposContainer');
 
-// Función para guardar el nombre del jugador
+// --- Funciones del juego ---
+
+// Guardar nombre
 guardarNombreBtn.addEventListener('click', () => {
     const nombre = nombreInput.value.trim();
     if (!nombre) {
@@ -56,12 +57,12 @@ guardarNombreBtn.addEventListener('click', () => {
     }
 });
 
-// Generar código
+// Generar código de partida
 function generarCodigo() {
     return Math.random().toString(36).substr(2, 5).toUpperCase();
 }
 
-// Render mano
+// Renderizar la mano del jugador actual
 function renderMano() {
     manoContainer.innerHTML = '';
     mano.forEach((carta, i) => {
@@ -78,27 +79,36 @@ function renderMano() {
     });
 }
 
-// Render campos
-function renderCampos() {
-    camposContainer.innerHTML = '';
-    // Iterar sobre los campos del objeto
-    Object.keys(campos).forEach(campoKey => {
-        const campo = campos[campoKey];
-        const div = document.createElement('div');
-        div.className = 'campo';
-        if (campo.length > 0) {
-            campo.forEach(c => {
-                const cartaDiv = document.createElement('div');
-                cartaDiv.textContent = c.nombre;
-                cartaDiv.className = `carta ${c.nombre.toLowerCase().replace(/\s/g, '-')}`;
-                div.appendChild(cartaDiv);
-            });
-        } else {
-            div.textContent = `Campo vacío`;
-            div.style.color = '#aaa';
-            div.style.fontSize = '14px';
-        }
-        camposContainer.appendChild(div);
+// Renderizar los campos de todos los jugadores
+function renderizarTodosLosCampos(jugadoresData) {
+    todosCamposContainer.innerHTML = '';
+    Object.keys(jugadoresData).forEach(nombre => {
+        const jugadorDiv = document.createElement('div');
+        jugadorDiv.className = 'jugador-campos';
+        jugadorDiv.innerHTML = `<h4>Campos de ${nombre}</h4>`;
+
+        const camposDelJugador = jugadoresData[nombre].campos;
+        
+        Object.keys(camposDelJugador).forEach(campoKey => {
+            const campo = camposDelJugador[campoKey];
+            const campoDiv = document.createElement('div');
+            campoDiv.className = 'campo';
+            
+            if (campo.length > 0) {
+                campo.forEach(carta => {
+                    const cartaDiv = document.createElement('div');
+                    cartaDiv.textContent = carta.nombre;
+                    cartaDiv.className = `carta ${carta.nombre.toLowerCase().replace(/\s/g, '-')}`;
+                    campoDiv.appendChild(cartaDiv);
+                });
+            } else {
+                campoDiv.textContent = 'Campo vacío';
+                campoDiv.style.color = '#aaa';
+                campoDiv.style.fontSize = '12px';
+            }
+            jugadorDiv.appendChild(campoDiv);
+        });
+        todosCamposContainer.appendChild(jugadorDiv);
     });
 }
 
@@ -124,7 +134,6 @@ async function plantarCarta(i) {
     let planted = false;
     for (let j = 1; j <= 3; j++) {
         const campoKey = `campo${j}`;
-        // Comprobar si el campo está vacío o si la primera carta coincide
         if (campos[campoKey].length === 0 || campos[campoKey][0].nombre === cartaAPlantar.nombre) {
             campos[campoKey].push(cartaAPlantar);
             planted = true;
@@ -153,11 +162,11 @@ function iniciarListenerPartida() {
             const miData = partidaData.jugadores[nombreJugador];
             if (miData) {
                 mano = miData.mano;
-                // Los campos ahora son un objeto
                 campos = miData.campos; 
                 renderMano();
-                renderCampos();
             }
+            
+            renderizarTodosLosCampos(partidaData.jugadores);
 
             listaJugadores.innerHTML = '';
             Object.keys(partidaData.jugadores).forEach(jug => {
@@ -169,7 +178,9 @@ function iniciarListenerPartida() {
     });
 }
 
-// Función para crear la partida
+// --- Event Listeners y Lógica Inicial ---
+
+// Crear partida
 crearBtn.addEventListener('click', async () => {
     if (!nombreJugador) {
         alert("Primero guarda tu nombre.");
@@ -180,7 +191,6 @@ crearBtn.addEventListener('click', async () => {
     const mazoCompleto = crearMazo();
     const { mano: manoInicial, mazoActualizado } = repartirCartas(mazoCompleto, 5);
     
-    // Nueva estructura para los campos
     const camposIniciales = {
         campo1: [],
         campo2: [],
@@ -210,7 +220,7 @@ crearBtn.addEventListener('click', async () => {
     }
 });
 
-// Función para unirse a la partida
+// Unirse a partida
 async function unirseAPartida(codigo) {
     if (!nombreJugador) {
         alert("Primero guarda tu nombre.");
@@ -230,7 +240,6 @@ async function unirseAPartida(codigo) {
     let mazoRestante = partidaData.mazo;
     const { mano: nuevaMano, mazoActualizado } = repartirCartas(mazoRestante, 5);
     
-    // Nueva estructura para los campos al unirse
     const camposIniciales = {
         campo1: [],
         campo2: [],
