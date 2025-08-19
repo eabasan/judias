@@ -22,7 +22,7 @@ let campos = {};
 let mazo = [];
 let turnoActual = '';
 let faseActual = 0; 
-let oro = 0; // Oro del jugador actual
+let oro = 0;
 
 // Constante para la tabla de precios de las judías (simplificada)
 const PRECIOS = {
@@ -47,7 +47,7 @@ const partidaInfoDiv = document.getElementById('partidaInfo');
 const todosCamposContainer = document.getElementById('todosCamposContainer');
 const pasarTurnoBtn = document.getElementById('pasarTurnoBtn');
 const faseInfo = document.getElementById('faseInfo');
-const oroInfo = document.getElementById('oroInfo'); // Nuevo para mostrar el oro
+const oroInfo = document.getElementById('oroInfo');
 
 // --- Funciones del juego ---
 
@@ -79,7 +79,9 @@ function renderMano() {
         const div = document.createElement('div');
         div.className = `carta ${carta.nombre.toLowerCase().replace(/\s/g, '-')}`;
         div.textContent = carta.nombre;
-        if (nombreJugador === turnoActual && faseActual === 1) {
+
+        // Modificación clave: solo la primera carta es plantable
+        if (nombreJugador === turnoActual && faseActual === 1 && i === 0) {
             div.addEventListener('click', () => plantarCarta(i));
         } else {
             div.style.opacity = 0.5;
@@ -89,7 +91,6 @@ function renderMano() {
     });
 }
 
-// Renderiza los campos del jugador actual con sus botones de cosecha
 function renderCampos() {
     camposContainer.innerHTML = '';
     Object.keys(campos).forEach(campoKey => {
@@ -104,7 +105,6 @@ function renderCampos() {
                 cartaDiv.className = `carta ${c.nombre.toLowerCase().replace(/\s/g, '-')}`;
                 div.appendChild(cartaDiv);
             });
-            // Botón para cosechar
             const cosecharBtn = document.createElement('button');
             cosecharBtn.textContent = 'Cosechar';
             cosecharBtn.className = 'cosechar-btn';
@@ -162,7 +162,6 @@ async function actualizarEstadoJugador() {
     });
 }
 
-// Nueva función para cosechar un campo
 async function cosecharCampo(campoKey) {
     if (!campos[campoKey] || campos[campoKey].length === 0) {
         alert("Este campo está vacío, no se puede cosechar.");
@@ -174,16 +173,20 @@ async function cosecharCampo(campoKey) {
     const precioTabla = PRECIOS[tipoJudia];
 
     let monedasGanadas = 0;
-    for (let i = 0; i < precioTabla.length; i++) {
-        if (cantidad >= precioTabla[i]) {
-            monedasGanadas++;
+    if (precioTabla) {
+        monedasGanadas = precioTabla.findIndex(minCards => cantidad >= minCards) + 1;
+        if (monedasGanadas > 0) {
+            monedasGanadas--; 
+        } else {
+             monedasGanadas = 0;
         }
+    } else {
+        alert("Tipo de judía no reconocido en la tabla de precios.");
+        return;
     }
     
-    // Si no se cumple ningún umbral, no se gana oro
     if (monedasGanadas === 0) {
         alert(`No hay suficientes judías para ganar oro en este campo.`);
-        // Limpiar el campo aunque no se gane oro
         campos[campoKey] = [];
         await updateDoc(doc(db, 'partidas', codigoPartida), {
             [`jugadores.${nombreJugador}.campos`]: campos
@@ -191,14 +194,12 @@ async function cosecharCampo(campoKey) {
         return;
     }
 
-    // Actualizar oro del jugador en Firebase
     const partidaRef = doc(db, 'partidas', codigoPartida);
     const partidaSnapshot = await getDoc(partidaRef);
     const jugadorData = partidaSnapshot.data().jugadores[nombreJugador];
     const oroActual = jugadorData.oro || 0;
     const nuevoOro = oroActual + monedasGanadas;
     
-    // Limpiar el campo después de cosechar
     campos[campoKey] = [];
     
     await updateDoc(partidaRef, {
@@ -208,8 +209,8 @@ async function cosecharCampo(campoKey) {
     alert(`Has cosechado ${cantidad} judías de tipo "${tipoJudia}" y ganado ${monedasGanadas} de oro.`);
 }
 
-
 async function plantarCarta(i) {
+    // La comprobación i === 0 ya la tenemos en renderMano
     if (nombreJugador !== turnoActual || faseActual !== 1) {
         alert('No es tu turno o no es la fase correcta para plantar.');
         return;
@@ -272,10 +273,10 @@ function iniciarListenerPartida() {
             if (miData) {
                 mano = miData.mano;
                 campos = miData.campos; 
-                oro = miData.oro; // Actualizar el oro del jugador
-                oroInfo.textContent = `Oro: ${oro}`; // Mostrar el oro
+                oro = miData.oro;
+                oroInfo.textContent = `Oro: ${oro}`;
                 renderMano();
-                renderCampos(); // Llama a la función para renderizar los campos del jugador
+                renderCampos();
             }
             
             renderizarTodosLosCampos(partidaData.jugadores);
@@ -301,7 +302,7 @@ crearBtn.addEventListener('click', async () => {
     const mazoCompleto = crearMazo();
     const { mano: manoInicial, mazoActualizado } = repartirCartas(mazoCompleto, 5);
     
-    const camposIniciales = { campo1: [], campo2: [] }; // Iniciar con solo dos campos
+    const camposIniciales = { campo1: [], campo2: [], campo3: [] }; 
     
     try {
         await setDoc(doc(db, 'partidas', codigoPartida), {
@@ -340,7 +341,7 @@ async function unirseAPartida(codigo) {
     let mazoRestante = partidaData.mazo;
     const { mano: nuevaMano, mazoActualizado } = repartirCartas(mazoRestante, 5);
     
-    const camposIniciales = { campo1: [], campo2: [] }; // Iniciar con solo dos campos
+    const camposIniciales = { campo1: [], campo2: [], campo3: [] }; 
     
     try {
         await updateDoc(partidaRef, {
